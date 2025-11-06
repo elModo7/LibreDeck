@@ -14,7 +14,7 @@ Specially designed for **streaming** but also for **power users, video editors a
 
 **[AutoHotkey v1 (Heavily Recommended)](https://www.autohotkey.com/)**
 
-**[Latest Release](https://github.com/elModo7/LibreDeck-Offline/releases/download/2.7b-Offline/Nova.Macros.Offline.Installer.zip)**
+**[Latest Release](https://github.com/elModo7/LibreDeck/releases/tag/3.8.7)**
 
 ## **Installing from source:**
 
