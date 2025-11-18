@@ -4,11 +4,7 @@
 > Specially designed for **streaming** but also for **power users, video editors and programmers**.
 > Integrates with OBS, Spotify, OBSBOT, Discord...
 
-<p align="center" width="100%">
-<video src="https://github.com/user-attachments/assets/df9e0e56-9599-4b89-8996-6c2bf91b1275" width="80%" controls></video>
-</p>
-
-![Network Diagram](https://elmodo7.github.io/static/img/personal_projects/libredeck/libredeck_networking.svg)
+![3 examples](https://github.com/user-attachments/assets/bb55b06c-ab14-4736-be8c-13e8675d8627)
 
 ## **Installing from releases:**
 
@@ -82,7 +78,11 @@ A file named ***"LibreDeck Client.exe"*** will apear, run that file. Done!
 - Windows 10 (Previous versions work on win7)
 - AutoHotkey 1.37.02 U32
 
-# Pictures:
+# Pictures & Videos:
+
+<p align="center" width="100%">
+<video src="https://github.com/user-attachments/assets/df9e0e56-9599-4b89-8996-6c2bf91b1275" width="80%" controls></video>
+</p>
 
 **Sample:**
 
