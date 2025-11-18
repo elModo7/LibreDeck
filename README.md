@@ -83,35 +83,3 @@ A file named ***"LibreDeck Client.exe"*** will apear, run that file. Done!
 <p align="center" width="100%">
 <video src="https://github.com/user-attachments/assets/df9e0e56-9599-4b89-8996-6c2bf91b1275" width="80%" controls></video>
 </p>
-
-**Sample:**
-
-![Sample](https://i.postimg.cc/brVvCHLC/sample.jpg)
-
-**Button Context Menu:**
-
-![button_context_menu](https://github.com/user-attachments/assets/a4d9cdf0-730b-4ebf-b2d7-2055d0ee7ca5)
-
-**OBS Functions:**
-
-![macro_creator_obs_actions](https://github.com/user-attachments/assets/92674e3c-17f0-47b6-a8fc-aeaefa088c7e)
-
-**OBS Link:**
-
-![macro_creator_obs_set_scene](https://github.com/user-attachments/assets/184f3283-75d1-4df4-811f-3d04ca4447ef)
-
-**Run File Script Generator:**
-
-![macro_creator_run_file](https://github.com/user-attachments/assets/20e7b36c-4d14-4921-b868-e6a321c53a48)
-
-**Send Macro Generator:**
-
-![macro_creator_macro](https://github.com/user-attachments/assets/032682f9-2b0a-4331-be7b-9f42223095dd)
-
-**Script Generator Preview:**
-
-![macro_creator_quick_actions](https://github.com/user-attachments/assets/35d5ad62-af06-468d-82b7-d7ca888f98c5)
-
-**Online Settings:**
-
-![libredeck_Client_zrQCzILpRu](https://github.com/user-attachments/assets/89feb4a2-5a87-46b1-937d-c778fdc12c61)
