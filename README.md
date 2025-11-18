@@ -1,4 +1,4 @@
-# **Nova Macros (*A Stream Deck Clone*)**
+# **LibreDeck (*A Stream Deck Clone*)**
 Built for **touchscreen** controls but also works as a normal desktop app for managing macros and shortcuts.  
 Specially designed for **streaming** but also for **power users, video editors and programmers**. 
 
@@ -7,7 +7,7 @@ Specially designed for **streaming** but also for **power users, video editors a
 <video src="https://github.com/user-attachments/assets/df9e0e56-9599-4b89-8996-6c2bf91b1275" width="80%" controls></video>
 </p>
 
-![Network Diagram](https://elmodo7.github.io/static/img/personal_projects/nova_macros/nova_macros_networking.svg)
+![Network Diagram](https://elmodo7.github.io/static/img/personal_projects/libredeck/libredeck_networking.svg)
 
 ## **Installing from releases:**
 
@@ -18,11 +18,11 @@ Specially designed for **streaming** but also for **power users, video editors a
 ## **Installing from source:**
 
 Download and Install **32 Bit AutoHotkey v1** from [here](https://www.autohotkey.com/)
-Right click on ***"Nova Macros Client.ahk"***, click **Compile Script**.
-A file named ***"Nova Macros Client.exe"*** will apear, run that file. Done!
+Right click on ***"LibreDeck Client.ahk"***, click **Compile Script**.
+A file named ***"LibreDeck Client.exe"*** will apear, run that file. Done!
 
 > [!IMPORTANT]  
-> Must be compiled with AutoHotkey v1 Unicode 32 bits. If unsure, right click on ***"Nova Macros Client.ahk"*** and click **Compile Script (GUI)** make sure "Base File" is set to U32 AutoHotkey.
+> Must be compiled with AutoHotkey v1 Unicode 32 bits. If unsure, right click on ***"LibreDeck Client.ahk"*** and click **Compile Script (GUI)** make sure "Base File" is set to U32 AutoHotkey.
 
   
 # **Features:**
@@ -108,5 +108,5 @@ A file named ***"Nova Macros Client.exe"*** will apear, run that file. Done!
 
 **Online Settings:**
 
-![Nova_Macros_Client_zrQCzILpRu](https://github.com/user-attachments/assets/89feb4a2-5a87-46b1-937d-c778fdc12c61)
+![libredeck_Client_zrQCzILpRu](https://github.com/user-attachments/assets/89feb4a2-5a87-46b1-937d-c778fdc12c61)
 

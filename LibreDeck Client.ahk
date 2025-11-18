@@ -1,10 +1,10 @@
 ﻿; OS Version ...: Windows 10+ (Previous versions tested working on Win7)
 ; Requires AutoHotkeyU32
-;@Ahk2Exe-SetName Nova Macros Client
-;@Ahk2Exe-SetDescription Nova Macros for TouchScreen and Remote Control
-;@Ahk2Exe-SetVersion 3.8.6
+;@Ahk2Exe-SetName LibreDeck Client
+;@Ahk2Exe-SetDescription LibreDeck for TouchScreen and Remote Control
+;@Ahk2Exe-SetVersion 3.8.7
 ;@Ahk2Exe-SetCopyright Copyright (c) 2025`, elModo7 - VictorDevLog
-;@Ahk2Exe-SetOrigFilename Nova Macros Client.exe
+;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
 ; *******************************
 /*
@@ -51,7 +51,7 @@ SetBatchLines, -1
 #Include <talk>
 #Include <plugin_system>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "3.8.6"
+global ClientVersionNumber := "3.8.7"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -127,17 +127,19 @@ contextcolor(color:=2) ; change the number here from the list above if you want 
 ; TRAY MENU
 ; *******************************
 Menu, tray, NoStandard
-Menu, tray, tip, Nova Macros Client v%ClientVersionNumber%
+Menu, tray, tip, LibreDeck Client v%ClientVersionNumber%
+Menu, tray, add, Run LibreDeck server, runServer
+Menu tray, Icon, Run LibreDeck server, .\resources\img\ico\libredeck.ico
 Menu, tray, add, Hide, ToggleHide
 Menu tray, Icon, Hide, .\resources\img\ico\windows\cut_visibility.ico
 Menu, tray, add, Set Editor Path, CambiarRutaEditor
 Menu tray, Icon, Set Editor Path, .\resources\img\ico\windows\edit2.ico
 Menu tray, add, Set Start Window Possition, setStartPossition
 Menu tray, Icon, Set Start Window Possition, .\resources\img\ico\windows\window_possition.ico
-Menu tray, add, Backup Nova Macros Folder (*.7z), generateBackup
-Menu tray, Icon, Backup Nova Macros Folder (*.7z), .\resources\img\ico\windows\compressed_folder.ico
-Menu tray, add, Open Nova Macros Folder, openNovaMacrosFolder
-Menu tray, Icon, Open Nova Macros Folder, .\resources\img\ico\windows\folder.ico
+Menu tray, add, Backup LibreDeck Folder (*.7z), generateBackup
+Menu tray, Icon, Backup LibreDeck Folder (*.7z), .\resources\img\ico\windows\compressed_folder.ico
+Menu tray, add, Open LibreDeck Folder, openLibreDeckFolder
+Menu tray, Icon, Open LibreDeck Folder, .\resources\img\ico\windows\folder.ico
 Menu, tray, add
 Menu, tray, add, Network Settings, crearGuiNetworkSettings
 Menu tray, Icon, Network Settings, .\resources\img\ico\windows\network2.ico
@@ -336,7 +338,7 @@ Gui, Add, Text, x0 y543 w1024 h59 +BackgroundTrans cWhite Center GMoverVentana v
 Gui Add, Picture, x0 y0 w1024 h600 vbackgroundImg, % btnPics["background.png"] ? "HBITMAP:*" btnPics["background.png"] : ""
 EstablecerPagina(0)
 Gui, SplashScreen:Destroy
-Gui Show, % "w1024 h600 x" conf.x_Inicial "y" conf.y_Inicial, Nova Macros Client ; Do NOT change the name, it's used for notifications amongst other stuff
+Gui Show, % "w1024 h600 x" conf.x_Inicial "y" conf.y_Inicial, LibreDeck Client ; Do NOT change the name, it's used for notifications amongst other stuff
 if(conf.miniClient)
 {
 	conf.miniClient := 0
@@ -358,14 +360,14 @@ Return
 ToggleHide:
 if EsVisible
 {
-	WinHide, Nova Macros Client
+	WinHide, LibreDeck Client
 	Menu, tray, Rename, Hide, Show
 	EsVisible = 0
 }
 else
 {
-	WinShow, Nova Macros Client
-	WinActivate, Nova Macros Client
+	WinShow, LibreDeck Client
+	WinActivate, LibreDeck Client
 	Menu, tray, Rename, Show, Hide
 	EsVisible = 1
 }
@@ -447,13 +449,13 @@ ComprobarExistenciaBoton()
 SiempreVisible:
 	if(conf.siempreVisible)
 	{
-		Winset, AlwaysOnTop, Off, Nova Macros Client
+		Winset, AlwaysOnTop, Off, LibreDeck Client
 		conf.siempreVisible := 0
 		Menu ContextMenuGenerico, UnCheck, Always on Top
 	}
 	else
 	{
-		Winset, AlwaysOnTop, , Nova Macros Client
+		Winset, AlwaysOnTop, , LibreDeck Client
 		conf.siempreVisible := 1
 		Menu ContextMenuGenerico, Check, Always on Top
 	}
@@ -463,12 +465,12 @@ return
 SetSiempreVisibleInicial:
 	if(!conf.siempreVisible)
 	{
-		Winset, AlwaysOnTop, Off, Nova Macros Client
+		Winset, AlwaysOnTop, Off, LibreDeck Client
 		Menu ContextMenuGenerico, UnCheck, Always on Top
 	}
 	else
 	{
-		Winset, AlwaysOnTop, , Nova Macros Client
+		Winset, AlwaysOnTop, , LibreDeck Client
 		Menu ContextMenuGenerico, Check, Always on Top
 	}
 return
@@ -561,7 +563,7 @@ if conf.miniClient
 	GuiControl, MoveDraw, wifi_icon, x960 y536 w64 h64
 	GuiControl, MoveDraw, settings_icon, x960 y0 w64 h64
 	GuiControl, MoveDraw, backgroundImg, x0 y0 w1024 h600
-	Gui Show, w1024 h600, Nova Macros Client
+	Gui Show, w1024 h600, LibreDeck Client
 }
 else
 {
@@ -592,7 +594,7 @@ else
 	GuiControl, MoveDraw, wifi_icon, x353 y168 w32 h32
 	GuiControl, MoveDraw, settings_icon, x353 y0 w32 h32
 	GuiControl, MoveDraw, backgroundImg, x0 y0 w385 h200
-	Gui, Show, w385 h200, Nova Macros Client
+	Gui, Show, w385 h200, LibreDeck Client
 }
 gosub, setWifiIcon ; Resets the wifi icon without loosing quality bug on resize
 DllCall("LockWindowUpdate", "UInt", 0)
@@ -1077,7 +1079,7 @@ Exit:
 ; *******************************
 ~Right::
 	SetTitleMatchMode, 3
-	IfWinActive, Nova Macros Client ahk_class AutoHotkeyGUI
+	IfWinActive, LibreDeck Client ahk_class AutoHotkeyGUI
 	{
 		gosub, RightPage
 	}
@@ -1086,7 +1088,7 @@ return
 
 ~Left::
 	SetTitleMatchMode, 3
-	IfWinActive, Nova Macros Client ahk_class AutoHotkeyGUI
+	IfWinActive, LibreDeck Client ahk_class AutoHotkeyGUI
 	{
 		gosub, LeftPage
 	}
@@ -1095,7 +1097,7 @@ return
 
 ~^Right::
 	SetTitleMatchMode, 3
-	IfWinActive, Nova Macros Client ahk_class AutoHotkeyGUI
+	IfWinActive, LibreDeck Client ahk_class AutoHotkeyGUI
 	{
 		gosub, RightPage ; Incremento de 10 en 10
 	}
@@ -1104,7 +1106,7 @@ return
 
 ~^Left::
 	SetTitleMatchMode, 3
-	IfWinActive, Nova Macros Client ahk_class AutoHotkeyGUI
+	IfWinActive, LibreDeck Client ahk_class AutoHotkeyGUI
 	{
 		gosub, LeftPage ; Decremento de 10 en 10
 	}
@@ -1269,9 +1271,9 @@ DeleteButtonFunction:
 return
 
 setStartPossition:
-	if(WinExist("Nova Macros Start Pos"))
+	if(WinExist("LibreDeck Start Pos"))
 	{
-		WinActivate, Nova Macros Start Pos
+		WinActivate, LibreDeck Start Pos
 	}
 	else
 	{
@@ -1281,7 +1283,7 @@ setStartPossition:
 		Gui startPos:Add, Edit, x72 y40 w120 h21 vy_Inicial +Center +Number, % conf.y_Inicial
 		Gui startPos:Add, Button, x112 y72 w80 h23 gsaveStartPossition, Set and Save
 		Gui startPos:Add, Button, x8 y72 w80 h23 ggetCurrentPos, Get current
-		Gui startPos:Show, w200 h103, Nova Macros Start Pos
+		Gui startPos:Show, w200 h103, LibreDeck Start Pos
 	}
 return
 
@@ -1292,11 +1294,11 @@ saveStartPossition:
 	conf.y_Inicial := y_Inicial
 	gosub, guardarConfig
 	Gui, startPos:Destroy
-	WinMove, Nova Macros Client,, % x_Inicial, % y_Inicial
+	WinMove, LibreDeck Client,, % x_Inicial, % y_Inicial
 return
 
 getCurrentPos:
-	WinGetPos, x, y,,, Nova Macros Client
+	WinGetPos, x, y,,, LibreDeck Client
 	GuiControl, startPos:, x_Inicial, % x
 	GuiControl, startPos:, y_Inicial, % y
 return
@@ -1398,9 +1400,9 @@ OnTcpRecv(this)
 }
 
 crearGuiNetworkSettings:
-	if(WinExist("Nova Macros Network Settings"))
+	if(WinExist("LibreDeck Network Settings"))
 	{
-		WinActivate, Nova Macros Network Settings
+		WinActivate, LibreDeck Network Settings
 	}
 	else
 	{
@@ -1417,8 +1419,8 @@ crearGuiNetworkSettings:
 		Gui networkSettings:Add, Button, x16 y136 w80 h23 gSaveNetworkConfig, SAVE CONFIG
 		Gui networkSettings:Add, Button, x104 y136 w80 h23 gConnectToServer, CONNECT
 		Gui networkSettings:Add, Text, x0 y168 w214 h2 +0x10 ; Separator
-		Gui networkSettings:Add, Text, x8 y169 w191 h23 +Center +0x200 vNetworkStatusInfo, Nova Macros - Network Config
-		Gui networkSettings:Show, w208 h192, Nova Macros Network Settings
+		Gui networkSettings:Add, Text, x8 y169 w191 h23 +Center +0x200 vNetworkStatusInfo, LibreDeck - Network Config
+		Gui networkSettings:Show, w208 h192, LibreDeck Network Settings
 	}
 Return
 
@@ -1580,7 +1582,7 @@ setButtonIcon(buttonId, imagePathOrName) {
 		GuiControl, MoveDraw, Boton%buttonId%, w130 h130
 }
 
-; Notification examples at: plugins: notification_examples.ahk & backup_nova_macros.ahk
+; Notification examples at: plugins: notification_examples.ahk & backup_libredeck.ahk
 showIncomingNotification:
 	try {
 		incomingNotification := ParseJson(incomingNotification)
@@ -1673,7 +1675,7 @@ vaciarMemoriaIconos:
 return
 
 generateBackup:
-	Run, % """" A_ScriptDir "\lib\autohotkey.exe"" """ A_ScriptDir "\plugins\backup_nova_macros.ahk"""
+	Run, % """" A_ScriptDir "\lib\autohotkey.exe"" """ A_ScriptDir "\plugins\backup_libredeck.ahk"""
 return
 
 changeReactiveSetting:
@@ -1703,9 +1705,9 @@ setReactiveService:
 return
 
 setPageByActiveProgram:
-	; Only trigger changes and app check when Nova Macros is visible
+	; Only trigger changes and app check when LibreDeck is visible
 	DetectHiddenWindows, Off
-	if(WinExist("Nova Macros Client"))
+	if(WinExist("LibreDeck Client"))
 	{
 		WinGet, activeProcess, ProcessName, A
 		if(previousActiveProcess != activeProcess && activeProcess != A_ScriptName){
@@ -1816,10 +1818,10 @@ bindFolderToProgramClose:
 return
 
 showAboutScreen:
-	showAboutScreen("Nova Macros v" ClientVersionNumber, "A multi-purpose macro pannel tailored to be used both in single screen setups, multi screen, touch support and multi machine setups via sockets.")
+	showAboutScreen("LibreDeck v" ClientVersionNumber, "A multi-purpose macro pannel tailored to be used both in single screen setups, multi screen, touch support and multi machine setups via sockets.")
 return
 
-openNovaMacrosFolder:
+openLibreDeckFolder:
 	Run, % A_ScriptDir
 return
 
@@ -1836,6 +1838,10 @@ reloadPlugins:
 	{
 		BuildMenusFromPlugin(plugin)
 	}
+return
+
+runServer:
+	Run, LibreDeck Server.exe
 return
 
 #Include plugins/plugin_list.ahk

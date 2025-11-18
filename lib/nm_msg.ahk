@@ -5,9 +5,9 @@ nmMsg(nmMsg, time:=1, region:=0, color:="FFFFFF")
 {
 	detectHiddenWindowsPrev := A_DetectHiddenWindows
 	DetectHiddenWindows, On
-	if (WinExist("ahk_exe Nova Macros Client.exe")) {
+	if (WinExist("ahk_exe LibreDeck Client.exe")) {
 		region := region ? "top" : "bottom"
-		receiver := new talk("Nova Macros Client.exe")
+		receiver := new talk("LibreDeck Client.exe")
 		receiver.setVar("incomingNotification", "{""text"": """ nmMsg """, ""duration"": " time*1000 ", ""region"": """ region """}")
 		receiver.runlabel("showIncomingNotification")
 	}

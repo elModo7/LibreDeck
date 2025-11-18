@@ -1,15 +1,15 @@
-﻿; Nova Macros (3.7.6+)
+﻿; LibreDeck (3.7.6+)
 #NoEnv
 #SingleInstance Force
 #Include ..\lib\talk.ahk
 detectHiddenWindowsPrev := A_DetectHiddenWindows
 DetectHiddenWindows, On
-if (!WinExist("ahk_exe Nova Macros Client.exe")) {
-	MsgBox 0x10, Client not found!, Nova Macros Client was not found!
+if (!WinExist("ahk_exe LibreDeck Client.exe")) {
+	MsgBox 0x10, Client not found!, LibreDeck Client was not found!
 	ExitApp
 }
 
-receiver := new talk("Nova Macros Client.exe")
+receiver := new talk("LibreDeck Client.exe")
 
 nmMsg("Bottom Notification Example", 0)
 Sleep, 2000
@@ -66,9 +66,9 @@ nmMsg(nmMsg, time:=1, region:=0, color:="FFFFFF")
 	global receiver
 	detectHiddenWindowsPrev := A_DetectHiddenWindows
 	DetectHiddenWindows, On
-	if (WinExist("ahk_exe Nova Macros Client.exe")) {
+	if (WinExist("ahk_exe LibreDeck Client.exe")) {
 		region := region ? "top" : "bottom"
-		;~ receiver := new talk("Nova Macros Client")
+		;~ receiver := new talk("LibreDeck Client")
 		receiver.setVar("incomingNotification", "{""text"": """ nmMsg """, ""duration"": " time*1000 ", ""region"": """ region """}")
 		receiver.runlabel("showIncomingNotification")
 	}

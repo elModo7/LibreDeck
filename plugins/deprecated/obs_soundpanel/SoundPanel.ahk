@@ -5,7 +5,7 @@
 CoordMode,Mouse,Screen
 DetectHiddenWindows, On
 #Include, plugins\nm_msg.ahk
-WinGetPos,X,Y,,,Nova Macros Client
+WinGetPos,X,Y,,,LibreDeck Client
 IfWinNotExist, ahk_exe obs64.exe
 {
 	nmMsg("OBS Not Detected!",2)

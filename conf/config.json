@@ -11,7 +11,7 @@
 	},
 	"ip":"192.168.1.128",
 	"lookForUpdates":0,
-	"miniClient":0,
+	"miniClient":1,
 	"moverRatonAlPulsarBoton":0,
 	"online":0,
 	"pantalla_Mitad_X":960,

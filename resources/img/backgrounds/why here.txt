@@ -1,1 +1,1 @@
-Because Nova Macros loads main image folder to RAM and I don't want theese to fill in RAM space.
+Because LibreDeck loads main image folder to RAM and I don't want theese to fill in RAM space.

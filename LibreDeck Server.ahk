@@ -1,16 +1,16 @@
 ﻿; OS Version ...: Windows 10 (Should work with Win7, maybe WinXP)
-;@Ahk2Exe-SetName Nova Macros Client Online
-;@Ahk2Exe-SetDescription Nova Macros Server for remote control
-;@Ahk2Exe-SetVersion 0.4.3
+;@Ahk2Exe-SetName LibreDeck Client Online
+;@Ahk2Exe-SetDescription LibreDeck Server for remote control
+;@Ahk2Exe-SetVersion 0.4.4
 ;@Ahk2Exe-SetCopyright Copyright (c) 2025`, elModo7
-;@Ahk2Exe-SetOrigFilename Nova Macros Server.exe
+;@Ahk2Exe-SetOrigFilename LibreDeck Server.exe
 ; INITIALIZE
 ; *******************************
 #SingleInstance,Force
 SetBatchLines, -1
 #NoEnv
 #Persistent
-global versionNumber := "0.4.3"
+global versionNumber := "0.4.4"
 global clientVersion := versionNumber " - elModo7 / VictorDevLog " A_YYYY
 #Include <Socket>
 #Include <JSON>
@@ -35,17 +35,20 @@ if(!FileExist("./conf/server_config.json"))
 FileRead, conf, ./conf/server_config.json
 global conf := ParseJson(conf)
 gosub, guardarConfigShared
+contextcolor() ; Dark Theme
 
 ; TRAY MENU
 ; *******************************
 Menu, tray, NoStandard
+Menu, tray, Add, Run LibreDeck client, runClient
+Menu tray, Icon, Run LibreDeck client, .\resources\img\ico\libredeck.ico
 Menu, tray, Add, Use built-in AHK, toggleBuiltInAhk
 Menu, tray, Add, Update Resource Pack Now, 7zImageButtons
 Menu tray, Icon, Update Resource Pack Now, .\resources\img\ico\windows\compressed_folder.ico
 Menu, tray, Add, Set custom Port, setPort
 Menu tray, Icon, Set custom Port, .\resources\img\ico\windows\network2.ico
-Menu, tray, add, Open Nova Macros Folder, openNovaMacrosFolder
-Menu, tray, Icon, Open Nova Macros Folder, .\resources\img\ico\windows\folder.ico
+Menu, tray, add, Open LibreDeck Folder, openLibreDeckFolder
+Menu, tray, Icon, Open LibreDeck Folder, .\resources\img\ico\windows\folder.ico
 Menu, tray, Add, Run on Startup, startWithWindows
 Menu tray, Icon, Run on Startup, .\resources\img\ico\windows\window_possition.ico
 Menu, tray, add
@@ -148,7 +151,7 @@ OnTCPAccept(this)
     global Client
     Client := this.accept()
     Client.onRecv := func("OnTCPRecvServer")
-    Client.sendText("Nova Macros Server")
+    Client.sendText("LibreDeck Server")
 }
 
 7zImageButtons:
@@ -210,20 +213,53 @@ startWithWindows:
 	gosub, guardarConfig
 	if(conf.startWithWindows)
 	{
-		FileCreateShortcut, %A_ScriptFullPath%, %A_AppData%\Microsoft\Windows\Start Menu\Programs\Startup\Nova Macros Server.lnk, %A_ScriptDir%, Nova Macros Server Software
+		FileCreateShortcut, %A_ScriptFullPath%, %A_AppData%\Microsoft\Windows\Start Menu\Programs\Startup\LibreDeck Server.lnk, %A_ScriptDir%, LibreDeck Server Software
 		Menu, tray, Check, Run on Startup
 	}
 	else
 	{
-		FileDelete, %A_AppData%\Microsoft\Windows\Start Menu\Programs\Startup\Nova Macros Server.lnk
+		FileDelete, %A_AppData%\Microsoft\Windows\Start Menu\Programs\Startup\LibreDeck Server.lnk
 		Menu, tray, Uncheck, Run on Startup
 	}
 return
 
 showAboutScreen:
-	showAboutScreen("Nova Macros Server v" versionNumber, "A multi-purpose RPC server for triggering scripts remotely on the running host via RAW TCP sockets.")
+	showAboutScreen("LibreDeck Server v" versionNumber, "A multi-purpose RPC server for triggering scripts remotely on the running host via RAW TCP sockets.")
 return
 
-openNovaMacrosFolder:
+openLibreDeckFolder:
 	Run, % A_ScriptDir
 return
+
+runClient:
+	clienteExecutable := "LibreDeck Client.exe"
+	previousDetectHiddenWindows := A_DetectHiddenWindows
+	IfWinNotExist, ahk_exe %clienteExecutable%
+	{
+		DetectHiddenWindows, On
+		IfWinExist, ahk_exe %clienteExecutable%
+		{
+			WinShow, ahk_exe %clienteExecutable%
+			WinActivate, ahk_exe %clienteExecutable%
+		}
+		else
+		{
+			Run, "%A_ScriptDir%\LibreDeck Client.exe"
+		}
+	}
+	else
+	{
+		WinShow, ahk_exe %clienteExecutable%
+		WinActivate, ahk_exe %clienteExecutable%
+	}
+	DetectHiddenWindows, % previousDetectHiddenWindows
+return
+
+contextcolor(color:=2)
+{
+	static uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "ptr")
+	static SetPreferredAppMode := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 135, "ptr")
+	static FlushMenuThemes := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 136, "ptr")
+	DllCall(SetPreferredAppMode, "int", color)
+	DllCall(FlushMenuThemes)
+}

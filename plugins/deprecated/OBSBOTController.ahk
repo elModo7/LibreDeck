@@ -1,4 +1,4 @@
-﻿; This is a custom class that, unlike my original OBSBOTController, does not make use of OSC2AHK.dll due to NovaMacros defaulting to AHK32, here we use an exe so that it's language agnostic.
+﻿; This is a custom class that, unlike my original OBSBOTController, does not make use of OSC2AHK.dll due to LibreDeck defaulting to AHK32, here we use an exe so that it's language agnostic.
 class OBSBOTController {
     __New(ip, port) {
         this.ip := ip

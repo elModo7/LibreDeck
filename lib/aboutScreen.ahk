@@ -1,6 +1,7 @@
-﻿; About Screen for my projects v0.0.8
+﻿; Careful! this is NOT my generic AboutScreen class, it uses a diferent folder for fonts, but that's about all the differences though
+; About Screen for my projects v0.0.8
 FileCreateDir % A_Temp "/font"
-FileInstall, res\font\BaiJamjuree.ttf, % A_Temp "\font\BaiJamjuree.ttf", 0
+FileInstall, resources\font\BaiJamjuree.ttf, % A_Temp "\font\BaiJamjuree.ttf", 0
 global fnt := A_Temp "\font\BaiJamjuree.ttf"
 global font1 := New CustomFont(fnt)
 global activableAboutButtons := ["Static6", "Static7", "Static8", "Static9", "Static10", "Static11", "Static12", "Static13", "Static14"] ; Social media icons

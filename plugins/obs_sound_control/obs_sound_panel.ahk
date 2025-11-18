@@ -20,8 +20,8 @@ neutron := new NeutronWindow()
 neutron.Load("obs_sound_panel.html")
 neutron.Gui("+LabelNeutron")
 neutron.Show("w1024 h600")
-if(WinExist("Nova Macros Client"))
-	WinGetPos,X,Y,,,Nova Macros Client
+if(WinExist("LibreDeck Client"))
+	WinGetPos,X,Y,,,LibreDeck Client
 else{
 	X := A_ScreenWidth / 2 - 505
 	Y := A_ScreenHeight / 2 - 280
