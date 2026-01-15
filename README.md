@@ -10,7 +10,7 @@
 
 **[AutoHotkey v1 (Heavily Recommended)](https://www.autohotkey.com/)**
 
-**[Latest Release](https://github.com/elModo7/LibreDeck/releases/tag/3.8.7)**
+**[Latest Release](https://github.com/elModo7/LibreDeck/releases/latest)**
 
 ## **Installing from source:**
 
