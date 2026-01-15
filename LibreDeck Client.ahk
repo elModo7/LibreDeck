@@ -1,9 +1,9 @@
-﻿; OS Version ...: Windows 10+ (Previous versions tested working on Win7)
+﻿; OS Version ...: > Windows 10
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
-;@Ahk2Exe-SetDescription LibreDeck for TouchScreen and Remote Control
-;@Ahk2Exe-SetVersion 3.8.7
-;@Ahk2Exe-SetCopyright Copyright (c) 2025`, elModo7 - VictorDevLog
+;@Ahk2Exe-SetDescription Macro Panel Client
+;@Ahk2Exe-SetVersion 3.8.8
+;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
 ; *******************************
@@ -51,7 +51,7 @@ SetBatchLines, -1
 #Include <talk>
 #Include <plugin_system>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "3.8.7"
+global ClientVersionNumber := "3.8.8"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true

@@ -1,8 +1,9 @@
-﻿; OS Version ...: Windows 10 (Should work with Win7, maybe WinXP)
-;@Ahk2Exe-SetName LibreDeck Client Online
-;@Ahk2Exe-SetDescription LibreDeck Server for remote control
-;@Ahk2Exe-SetVersion 0.4.4
-;@Ahk2Exe-SetCopyright Copyright (c) 2025`, elModo7
+﻿; OS Version ...: > Windows 10
+; Requires AutoHotkeyU32
+;@Ahk2Exe-SetName LibreDeck Server
+;@Ahk2Exe-SetDescription Macro Panel Server
+;@Ahk2Exe-SetVersion 0.4.6
+;@Ahk2Exe-SetCopyright 2026`, elModo7
 ;@Ahk2Exe-SetOrigFilename LibreDeck Server.exe
 ; INITIALIZE
 ; *******************************
@@ -10,7 +11,7 @@
 SetBatchLines, -1
 #NoEnv
 #Persistent
-global versionNumber := "0.4.4"
+global versionNumber := "0.4.6"
 global clientVersion := versionNumber " - elModo7 / VictorDevLog " A_YYYY
 #Include <Socket>
 #Include <JSON>
@@ -40,6 +41,7 @@ contextcolor() ; Dark Theme
 ; TRAY MENU
 ; *******************************
 Menu, tray, NoStandard
+Menu, tray, tip, % "LibreDeck Server v" versionNumber "`n`nPorts:`nsever: " conf.port "`nresources: " conf.resourceSharePort
 Menu, tray, Add, Run LibreDeck client, runClient
 Menu tray, Icon, Run LibreDeck client, .\resources\img\ico\libredeck.ico
 Menu, tray, Add, Use built-in AHK, toggleBuiltInAhk
@@ -160,6 +162,7 @@ return
 
 restart:
     Reload
+return
 
 FileMD5(filename)
 {

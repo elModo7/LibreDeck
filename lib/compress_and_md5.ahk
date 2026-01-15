@@ -31,6 +31,7 @@ ExitApp
     {
         ToolTip, % "Compressing..."
         RunWait, % A_WorkingDir "\lib\7za.exe a """ A_WorkingDir "\resources\shared\resourcePack.7z"" -m0=LZMA2 -mx=9 -mmt=on -aoa -mfb=64 """ A_WorkingDir "\resources\img\*.png""",, Hide
+        RunWait, % A_WorkingDir "\lib\7za.exe a """ A_WorkingDir "\resources\shared\resourcePack.zip"" -tzip -mx=9 -mmt=on -aoa """ A_WorkingDir "\resources\img\*.png""",, Hide
         FileRead, conf, ./conf/server_config.json
         global conf := ParseJson(conf)
         conf.folderButtons := client_conf.folderButtons
