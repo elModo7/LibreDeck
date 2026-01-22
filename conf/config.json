@@ -9,7 +9,8 @@
 		"2":"Folders",
 		"14":"OBS"
 	},
-	"ip":"192.168.1.128",
+	"ip":"127.0.0.1",
+	"isGolangServer":0,
 	"lookForUpdates":0,
 	"miniClient":1,
 	"moverRatonAlPulsarBoton":0,

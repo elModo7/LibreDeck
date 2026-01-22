@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 3.8.8
+;@Ahk2Exe-SetVersion 3.8.9
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -23,6 +23,7 @@ DISCARDED:
 - Volver a la carpeta anterior y volver a la raíz si se pulsa p.ej control
 
 LATEST CHANGES:
+- GoLang server support
 - OBS Websocket Compat 4.x -> 5.X
 - Improve online mode
 - Add dynamic buttons (3.7.6+)
@@ -51,7 +52,7 @@ SetBatchLines, -1
 #Include <talk>
 #Include <plugin_system>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "3.8.8"
+global ClientVersionNumber := "3.8.9"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -109,6 +110,7 @@ if(!FileExist("./conf/config.json"))
 	conf.builtin_ahk := 1
 	conf.reactiveWindow := 0
 	conf.lookForUpdates := 1
+	conf.isGolangServer := 0
 	gosub, guardarConfig
 }
 
@@ -1388,12 +1390,19 @@ GetOut:
 ; NETWORKING MODULE
 EnviarTCP(txtSnd)
 {
+	global conf
+	txtSnd := conf.isGolangServer ? txtSnd "`n" : txtSnd
     tcpCon.sendText(txtSnd)
 }
 
 OnTcpRecv(this)
 {
-	Activacion := "Activar" this.RecvText()
+	global conf
+	if (conf.isGolangServer)
+		StringReplace, txtBtnRecv, % this.recvText(), `n,,All
+	else
+		txtBtnRecv := this.recvText()
+	Activacion := "Activar" txtBtnRecv
 	GuiControl, Show, %Activacion%
 	feedbackEjecucion.push(Activacion)
 	SetTimer, OcultarFeedbackEjecucion, 150
