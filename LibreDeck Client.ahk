@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 4.0.2
+;@Ahk2Exe-SetVersion 4.0.4
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -54,7 +54,7 @@ SetBatchLines, -1
 #Include <plugin_system>
 #Include <LibreDeckButtonImage>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "4.0.2"
+global ClientVersionNumber := "4.0.4"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -63,6 +63,8 @@ global CarpetaBoton, PaginaCarpeta, BotonActivo, BotonAPulsar, windowHandler, Ip
 global RutaBoton1, RutaBoton2, RutaBoton3, RutaBoton4, RutaBoton5, RutaBoton6, RutaBoton7, RutaBoton8, RutaBoton9, RutaBoton10, RutaBoton11, RutaBoton12, RutaBoton13, RutaBoton14, RutaBoton15
 global feedbackEjecucion := []
 global plugins := []
+global LD_ScriptGeneratorMenuHandlers := {}
+global LD_ScriptGeneratorMenus := {}
 global NumeroPagina := 0
 global serverFound := 0
 global reactiveWindow := 0
@@ -437,6 +439,13 @@ return
 
 NotImplemented:
 	MsgBox, Not implemented
+return
+
+ScriptGeneratorMenuCommand:
+	ScriptGeneratorPregenerarImagenBoton(BotonActivo, A_ThisMenuItem)
+	handler := LD_ScriptGeneratorMenuHandlers[A_ThisMenu "|" A_ThisMenuItem]
+	if(handler != "")
+		Gosub, %handler%
 return
 
 ComprobarExistenciaBoton()
@@ -1064,25 +1073,29 @@ GenerarImagenBotonDefault(IdBoton)
 	if(ErrorLevel)
 		return
 	buttonImageType := Trim(buttonImageType)
-	if(buttonImageType = "")
-		buttonImageType := "MACRO"
+	;~ if(buttonImageType = "")
+		;~ buttonImageType := "MACRO"
 
-	InputBox, buttonImageTitle, Button Image Title, Insert main button title`nExamples`: Record`, Mute Mic`, Browser, , 420, 145,,,,,Example
+	InputBox, buttonImageTitle, Button Image Title, Insert main button title`nExamples`: Record`, Mute Mic`, Browser, , 420, 145,,,,,Demo
 	if(ErrorLevel)
 		return
 	buttonImageTitle := Trim(buttonImageTitle)
-	if(buttonImageTitle = "")
-	{
-		MsgBox, Button title can not be empty.
-		return
-	}
+	;~ if(buttonImageTitle = "") {
+		;~ MsgBox, Button title can not be empty.
+		;~ return
+	;~ }
 
 	InputBox, buttonImageSubtitle, Button Image Subtitle, Insert short description`nExamples`: LibreDeck`, OBS`, Spotify, , 420, 145,,,,,LibreDeck
 	if(ErrorLevel)
 		return
 	buttonImageSubtitle := Trim(buttonImageSubtitle)
-	if(buttonImageSubtitle = "")
-		buttonImageSubtitle := "LibreDeck"
+	;~ if(buttonImageSubtitle = "")
+		;~ buttonImageSubtitle := "LibreDeck"
+
+	buttonImageStyle := GenerarImagenBotonDefaultSeleccionarEstilo()
+	if(buttonImageStyle = "")
+		return
+	Gui, 1:Default
 
 	outDir := A_ScriptDir "\resources\img"
 	FileCreateDir, %outDir%
@@ -1105,13 +1118,14 @@ GenerarImagenBotonDefault(IdBoton)
 	btnPics[imageName] := ""
 	FileDelete, %imagePath%
 
-	if(!LD_ButtonImage_Render(imagePath, {style:"minimal", title:buttonImageType, value:buttonImageTitle, subtitle:buttonImageSubtitle}))
+	if(!LD_ButtonImage_Render(imagePath, {style:buttonImageStyle, title:buttonImageType, value:buttonImageTitle, subtitle:buttonImageSubtitle}))
 	{
 		MsgBox,,Error, Could not generate button image.
 		return
 	}
 
 	btnPics[imageName] := LoadPicture(imagePath)
+	Gui, 1:Default
 	if(EnCarpeta)
 	{
 		EstablecerPaginaCarpeta(CarpetaBoton, PaginaCarpeta)
@@ -1121,6 +1135,72 @@ GenerarImagenBotonDefault(IdBoton)
 		EstablecerPagina(NumeroPagina)
 	}
 }
+
+ScriptGeneratorPregenerarImagenBoton(IdBoton, menuText := "")
+{
+	global btnPics
+
+	outDir := A_ScriptDir "\resources\img"
+	FileCreateDir, %outDir%
+	imageName := IdBoton ".png"
+	imagePath := outDir "\" imageName
+	subtitle := menuText != "" ? menuText : "Script Generator"
+	displayId := IdBoton
+	if(EnCarpeta && CarpetaBoton != "" && SubStr(displayId, 1, StrLen(CarpetaBoton)) = CarpetaBoton)
+		displayId := SubStr(displayId, StrLen(CarpetaBoton) + 1)
+
+	DllCall("DeleteObject", "ptr", btnPics[imageName])
+	btnPics[imageName] := ""
+	FileDelete, %imagePath%
+
+	if(!LD_ButtonImage_Render(imagePath, {style:"minimal", title:"SCRIPT", value:displayId, subtitle:subtitle}))
+		return false
+
+	btnPics[imageName] := LoadPicture(imagePath)
+	Gui, 1:Default
+	if(EnCarpeta)
+		EstablecerPaginaCarpeta(CarpetaBoton, PaginaCarpeta)
+	else
+		EstablecerPagina(NumeroPagina)
+	return true
+}
+
+GenerarImagenBotonDefaultSeleccionarEstilo()
+{
+	global LD_ButtonImage_SelectedStyle, LD_ButtonImage_StyleCancelled
+
+	LD_ButtonImage_SelectedStyle := "minimal"
+	LD_ButtonImage_StyleCancelled := 1
+
+	Gui, ButtonImageStyle:New, +AlwaysOnTop +ToolWindow +OwnDialogs, Button Image Style
+	Gui, ButtonImageStyle:Margin, 12, 12
+	Gui, ButtonImageStyle:Add, Text, w260, Choose button image style:
+	Gui, ButtonImageStyle:Add, DropDownList, vLD_ButtonImage_SelectedStyle w260 Choose6, neon|resident|warning|pokemon|glass|minimal
+	Gui, ButtonImageStyle:Add, Button, x70 y80 w80 Default gButtonImageStyleOK, OK
+	Gui, ButtonImageStyle:Add, Button, x160 y80 w80 gButtonImageStyleCancel, Cancel
+	Gui, ButtonImageStyle:Show,, Button Image Style
+	WinWaitClose, Button Image Style
+	Gui, 1:Default
+
+	if(LD_ButtonImage_StyleCancelled)
+		return ""
+	return LD_ButtonImage_SelectedStyle
+}
+
+ButtonImageStyleOK:
+	Gui, ButtonImageStyle:Submit
+	LD_ButtonImage_StyleCancelled := 0
+	Gui, ButtonImageStyle:Destroy
+	Gui, 1:Default
+return
+
+ButtonImageStyleCancel:
+ButtonImageStyleGuiClose:
+ButtonImageStyleGuiEscape:
+	LD_ButtonImage_StyleCancelled := 1
+	Gui, ButtonImageStyle:Destroy
+	Gui, 1:Default
+return
 
 GetButtonScriptRelativePath(IdBoton, extension = "")
 {
@@ -1695,6 +1775,12 @@ return
 setBackground:
 	try {
 		incomingBackgroundChange := ParseJson(incomingBackgroundChange)
+
+		hasFolder := incomingBackgroundChange.HasKey("folderName") && incomingBackgroundChange.folderName != ""
+
+		if (hasFolder && (!EnCarpeta || incomingBackgroundChange.folderName != CarpetaBoton))
+			return
+
 		imagePathOrName := incomingBackgroundChange.imagePathOrName
 		DllCall("LockWindowUpdate", "UInt", windowHandler)
 		Loop, 2 ; Bug? Blurry on first change
@@ -1716,9 +1802,32 @@ return
 setButtonIconRemote:
 	try {
 		incomingButtonChange := ParseJson(incomingButtonChange)
-		setButtonIcon(incomingButtonChange.buttonId, incomingButtonChange.imagePathOrName)
+
+		hasFolder := incomingButtonChange.HasKey("folderName") && incomingButtonChange.folderName != ""
+		hasPage := incomingButtonChange.HasKey("page") && incomingButtonChange.page != ""
+
+		shouldUpdate := false
+
+		if (!hasFolder && !hasPage) {
+			shouldUpdate := true
+		} else if (hasFolder && hasPage) {
+			shouldUpdate := EnCarpeta
+				&& incomingButtonChange.folderName == CarpetaBoton
+				&& incomingButtonChange.page == PaginaCarpeta
+		} else if (hasPage) {
+			shouldUpdate := !EnCarpeta
+				&& incomingButtonChange.page == NumeroPagina
+		} else if (hasFolder) {
+			shouldUpdate := EnCarpeta
+				&& incomingButtonChange.folderName == CarpetaBoton
+		}
+
+		if (shouldUpdate) {
+			setButtonIcon(incomingButtonChange.buttonId, incomingButtonChange.imagePathOrName)
+		}
 	}
 return
+
 
 setButtonIcon(buttonId, imagePathOrName) {
 	global

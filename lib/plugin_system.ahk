@@ -1,4 +1,17 @@
 BuildMenusFromPlugin(plugin) {
+    global LD_ScriptGeneratorMenus
+
+    if (!IsObject(LD_ScriptGeneratorMenus))
+        LD_ScriptGeneratorMenus := {}
+
+    for _, menuDef in plugin.menus
+        if (menuDef.name = "scriptGenerator")
+            LD_ScriptGeneratorMenus[menuDef.name] := true
+
+    for _, reg in plugin.register_in
+        if (reg.menu = "scriptGenerator" && reg.submenu != "")
+            LD_ScriptGeneratorMenus[reg.submenu] := true
+
     for _, menuDef in plugin.menus
         BuildSubmenu_(menuDef)
 
@@ -6,14 +19,20 @@ BuildMenusFromPlugin(plugin) {
         RegisterSubmenu_(reg)
 }
 
-BuildSubmenu_(menuDef) {
+BuildSubmenu_(menuDef, scriptGeneratorChild := false) {
+    global LD_ScriptGeneratorMenus, LD_ScriptGeneratorMenuHandlers
+
+    if (!IsObject(LD_ScriptGeneratorMenuHandlers))
+        LD_ScriptGeneratorMenuHandlers := {}
+
     menuName := menuDef.name
     if (!menuName) {
         MsgBox, 16, Error, Missing "name" in a menu.
         return
     }
+    wrapScriptGeneratorCommands := scriptGeneratorChild || LD_ScriptGeneratorMenus[menuName]
 
-	try Menu, %menuName%, Delete
+    try Menu, %menuName%, Delete
 
     for _, item in menuDef.items
     {
@@ -25,7 +44,12 @@ BuildSubmenu_(menuDef) {
                 MsgBox, 16, Error, Missing "label" in an item from %menuName%.
                 continue
             }
-            Menu, %menuName%, Add, %labelText%, %handler%
+            if (wrapScriptGeneratorCommands) {
+                LD_ScriptGeneratorMenuHandlers[menuName "|" labelText] := handler
+                Menu, %menuName%, Add, %labelText%, ScriptGeneratorMenuCommand
+            } else {
+                Menu, %menuName%, Add, %labelText%, %handler%
+            }
             iconDef := GetItemIconOrDefault(menuDef, item)
             ApplyIcon(menuName, labelText, iconDef)
         }
@@ -34,7 +58,7 @@ BuildSubmenu_(menuDef) {
         }
         else if (type = "submenu") {
             if IsObject(item.submenu) {
-                BuildSubmenu_(item.submenu)
+                BuildSubmenu_(item.submenu, wrapScriptGeneratorCommands)
                 labelText := item.label ? item.label : item.submenu.name
                 if (labelText) {
                     Menu, %menuName%, Add, %labelText%, % ":" item.submenu.name
