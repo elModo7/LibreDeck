@@ -1,6 +1,6 @@
 ﻿; Version: 0.3.1
 ; Color param is deprecated!
-#Include talk.ahk
+#Include %A_WorkingDir%\lib\talk.ahk
 nmMsg(nmMsg, time:=1, region:=0, color:="FFFFFF")
 {
 	detectHiddenWindowsPrev := A_DetectHiddenWindows

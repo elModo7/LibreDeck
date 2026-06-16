@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 3.8.9
+;@Ahk2Exe-SetVersion 4.0.0
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -30,6 +30,7 @@ LATEST CHANGES:
 - Add notifications integration (same machine via talk.ahk) (3.7.6+)
 - Add remote icon, background changes (3.8.1+)
 - Add spotify integration (3.8.2+) -> https://github.com/CloakerSmoker/Spotify.ahk
+- Add proper button folders
 
 COMMENTS:
 - This script is one of my very first AutoHotkey scripts (Jun 2017), it can be improved A LOT, code quality wise (starting from keeping it consistent with a single language instead of Spanglish). However, I use it on a day to day basis and it is "robust enough" and convenient that I make heavy use of it, even above any other Hotkey, Dedicated Keyboard, Macro Deck, StreamDock or Android solutions I currently have purchased.
@@ -52,7 +53,7 @@ SetBatchLines, -1
 #Include <talk>
 #Include <plugin_system>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "3.8.9"
+global ClientVersionNumber := "4.0.0"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -68,6 +69,7 @@ global MsgBoxBtn1, MsgBoxBtn2, MsgBoxBtn3, MsgBoxBtn4
 SkinForm(Apply, A_ScriptDir . "\lib\script_generator\lib\them.dll", A_ScriptDir . "\lib\script_generator\lib\tm")
 OnExit, GetOut
 FileCreateDir, conf
+FileCreateDir, buttons
 global btnPics := {}
 GuiControl, splashScreen:, splashTxt, % "Reading config..."
 contextcolor(2) ;0=Default ;1=AllowDark ;2=ForceDark ;3=ForceLight ;4=Max
@@ -427,7 +429,7 @@ return
 
 ComprobarExistenciaBoton()
 {
-	buttonPath := "" BotonActivo ".ahk"
+	buttonPath := GetButtonScriptRelativePath(BotonActivo, "ahk")
 	if FileExist(buttonPath)
 	{
 		OnMessage(0x44, "OnMsgBox")
@@ -1015,7 +1017,8 @@ EstablecerImagenBoton(IdBoton)
 		FileDelete,./resources/img/%IdBoton%.png
 		DllCall("DeleteObject", "ptr", btnPics[IdBoton ".png"]) ; Dispose image from memory
 		btnPics[IdBoton ".png"] := ""
-		if(FileExist("./" IdBoton ".ahk"))
+		buttonPath := GetButtonScriptRelativePath(IdBoton, "ahk")
+		if(FileExist(buttonPath))
 		{
 			OnMessage(0x44, "OnMsgBox")
 			MsgBoxBtn1 = Delete
@@ -1024,7 +1027,7 @@ EstablecerImagenBoton(IdBoton)
 			OnMessage(0x44, "")
 
 			IfMsgBox Yes, {
-				FileDelete, %IdBoton%.ahk
+				FileDelete, %buttonPath%
 			}
 		}
 	} 
@@ -1042,11 +1045,62 @@ EstablecerImagenBoton(IdBoton)
 	}
 }
 
+GetButtonScriptRelativePath(IdBoton, extension = "")
+{
+	global conf
+	if(extension = "")
+		extension := conf.extension
+	if(SubStr(extension, 1, 1) != ".")
+		extension := "." extension
+
+	bestFolder := ""
+	bestSuffix := ""
+	for, k, folderName in conf.folderButtons
+	{
+		if(folderName = "")
+			continue
+		if(SubStr(IdBoton, 1, StrLen(folderName)) = folderName)
+		{
+			suffix := SubStr(IdBoton, StrLen(folderName) + 1)
+			if suffix is integer
+			{
+				if(StrLen(folderName) > StrLen(bestFolder))
+				{
+					bestFolder := folderName
+					bestSuffix := suffix
+				}
+			}
+		}
+	}
+
+	if(bestFolder != "")
+		return "buttons\" bestFolder "\" bestSuffix extension
+	return "buttons\" IdBoton extension
+}
+
+EnsureButtonScriptDirectory(scriptPath)
+{
+	SplitPath, scriptPath,, scriptDir
+	if(scriptDir != "")
+		FileCreateDir, %scriptDir%
+}
+
+CopyScriptToButton(sourcePath, IdBoton = "")
+{
+	global BotonActivo
+	if(IdBoton = "")
+		IdBoton := BotonActivo
+	buttonPath := GetButtonScriptRelativePath(IdBoton, "ahk")
+	EnsureButtonScriptDirectory(buttonPath)
+	FileCopy, %sourcePath%, % A_ScriptDir "\" buttonPath, 1
+}
+
 EditarScriptBoton(IdBoton)
 {
-	RutaScript := "" IdBoton "." conf.extension ""
+	RutaScript := GetButtonScriptRelativePath(IdBoton, conf.extension)
 	if(!FileExist(RutaScript))
 	{
+		EnsureButtonScriptDirectory(RutaScript)
 		FileAppend,,%RutaScript%
 	}
 	Run, % conf.scriptEditorPath " " RutaScript
@@ -1117,9 +1171,10 @@ return
 
 EjecutarFuncionBoton(BotonVisual, FicheroEjecutar)
 {
+	RutaScript := GetButtonScriptRelativePath(FicheroEjecutar, conf.extension)
 	if(conf.online && serverFound)
 	{
-		EnviarTCP("{""BotonVisual"":""" BotonVisual """,""FicheroEjecutar"":""" FicheroEjecutar "." conf.extension """}")
+		EnviarTCP("{""BotonVisual"":""" BotonVisual """,""FicheroEjecutar"":""" StrReplace(RutaScript, "\", "/") """}")
 		;~ OutputDebug, % "Enviando: " "{BotonVisual:" BotonVisual ",FicheroEjecutar:" FicheroEjecutar "." conf.extension "}"
 	}
 	else
@@ -1128,16 +1183,16 @@ EjecutarFuncionBoton(BotonVisual, FicheroEjecutar)
 		GuiControl, Show, %Activacion%
 		try
 		{
-			if(FileExist(A_ScriptDir "\" FicheroEjecutar "." conf.extension))
+			if(FileExist(A_ScriptDir "\" RutaScript))
 			{
 				if(conf.builtin_ahk)
 				{
 					
-					Run, % A_ScriptDir "\lib\autohotkey.exe " FicheroEjecutar "." conf.extension
+					Run, % A_ScriptDir "\lib\autohotkey.exe """ A_ScriptDir "\" RutaScript """", % A_ScriptDir
 				}
 				else
 				{
-					Run, % FicheroEjecutar "." conf.extension
+					Run, % """" A_ScriptDir "\" RutaScript """", % A_ScriptDir
 				}
 			}
 		}
@@ -1204,7 +1259,7 @@ DeleteFolderButton:
 		IfMsgBox Yes, {
 			if(conf.folderButtons[BotonActivo] != "")
 			{
-				Loop, Files, % A_ScriptDir "\" conf.folderButtons[BotonActivo] "*.ahk"
+				Loop, Files, % A_ScriptDir "\buttons\" conf.folderButtons[BotonActivo] "\*.ahk"
 				{
 					FileDelete, % A_LoopFileFullPath
 				}
@@ -1240,7 +1295,8 @@ DeleteFolderButton:
 return
 
 DeleteButtonFunction:
-	if(FileExist(BotonActivo ".ahk"))
+	buttonPath := GetButtonScriptRelativePath(BotonActivo, "ahk")
+	if(FileExist(buttonPath))
 	{
 		OnMessage(0x44, "OnMsgBox")
 		MsgBoxBtn1 = Delete
@@ -1249,7 +1305,7 @@ DeleteButtonFunction:
 		OnMessage(0x44, "")
 
 		IfMsgBox Yes, {
-			FileDelete, %BotonActivo%.ahk
+			FileDelete, %buttonPath%
 			OnMessage(0x44, "OnMsgBox")
 			MsgBoxBtn1 = Delete
 			MsgBoxBtn2 = Cancel

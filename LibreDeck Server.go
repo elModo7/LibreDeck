@@ -25,7 +25,7 @@ func main() {
 	addr := getenv("TCP_ADDR", "127.0.0.1:7778")
 
 	// Carpeta donde están los .ahk (botones)
-	buttonsDir := getenv("BUTTONS_DIR", "./")
+	buttonsDir := getenv("BUTTONS_DIR", "./buttons")
 
 	// Ruta al autohotkey (puede ser el builtin del proyecto)
 	ahkExe := getenv("AHK_EXE", `.\lib\autohotkey.exe`)
@@ -104,7 +104,9 @@ func handleConn(conn net.Conn, buttonsDir, ahkExe string) {
 					continue
 				}
 
-				_ = exec.Command(ahkExe, target).Start()
+				cmd := exec.Command(ahkExe, target)
+				cmd.Dir = filepath.Dir(buttonsDir)
+				_ = cmd.Start()
 			}
 		}
 
@@ -178,16 +180,22 @@ func popJSONObject(b []byte) (frame []byte, rest []byte, ok bool) {
 	return nil, b, false
 }
 
-// Permite solo nombres tipo "OBS1.ahk" (sin rutas)
+// Permite scripts dentro de BUTTONS_DIR. El cliente puede enviar
+// "OBS/1.ahk" o la ruta nueva completa "buttons/OBS/1.ahk".
 func resolveLocalButton(buttonsDir, fileName string) (string, error) {
 	fn := strings.TrimSpace(fileName)
 	if fn == "" {
 		return "", fmt.Errorf("missing_file")
 	}
 
-	// No rutas, no .., no separadores
-	if strings.Contains(fn, "..") || strings.ContainsAny(fn, `\/:`) {
-		return "", fmt.Errorf("invalid_file_name")
+	fn = filepath.Clean(filepath.FromSlash(fn))
+	if filepath.IsAbs(fn) || strings.Contains(fn, "..") || strings.Contains(fn, ":") {
+		return "", fmt.Errorf("invalid_file_path")
+	}
+
+	parts := strings.Split(fn, string(filepath.Separator))
+	if len(parts) > 0 && strings.EqualFold(parts[0], "buttons") {
+		fn = filepath.Join(parts[1:]...)
 	}
 
 	if strings.ToLower(filepath.Ext(fn)) != ".ahk" {
@@ -195,10 +203,23 @@ func resolveLocalButton(buttonsDir, fileName string) (string, error) {
 	}
 
 	full := filepath.Join(buttonsDir, fn)
-	if _, err := os.Stat(full); err != nil {
+	absButtons, err := filepath.Abs(buttonsDir)
+	if err != nil {
+		return "", fmt.Errorf("invalid_buttons_dir")
+	}
+	absFull, err := filepath.Abs(full)
+	if err != nil {
+		return "", fmt.Errorf("invalid_file_path")
+	}
+	rel, err := filepath.Rel(absButtons, absFull)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("outside_buttons_dir")
+	}
+
+	if _, err := os.Stat(absFull); err != nil {
 		return "", fmt.Errorf("file_not_found")
 	}
-	return full, nil
+	return absFull, nil
 }
 
 func getenv(k, def string) string {

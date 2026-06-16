@@ -1,12 +1,16 @@
-﻿; Since using my new dll version instead of an Exe and being forced to 64bit
+; Since using my new dll version instead of an Exe and being forced to 64bit
 ; This script needs to run as 64bit ahk and is no longer compatible with uskin
 #NoEnv
 #SingleInstance Force
 SetBatchLines -1
 #NoTrayIcon
-global buttonName = %0%
+global buttonPath = %0%
 #Include %A_WorkingDir%/lib/setAhk64self.ahk
-global buttonPath := buttonName ".ahk"
+if(SubStr(buttonPath, -3) != ".ahk")
+	buttonPath := buttonPath ".ahk"
+SplitPath, buttonPath,, buttonDir
+if(buttonDir != "")
+	FileCreateDir, %buttonDir%
 SkinForm(Apply, A_ScriptDir . "\lib\them.dll", A_ScriptDir . "\lib\tm")
 OnExit, GetOut
 global zoomValue
@@ -71,9 +75,9 @@ Generate(zoomValue)
 "#NoEnv
 #SingleInstance Force
 #NoTrayIcon
-#Include <setAhk64self>
-#Include <OBSBOTController>
-#Include <nm_msg>
+#Include %A_WorkingDir%\lib\setAhk64self.ahk
+#Include %A_WorkingDir%\lib\OBSBOTController.ahk
+#Include %A_WorkingDir%\lib\nm_msg.ahk
 SetBatchLines, -1
 DetectHiddenWindows, On
 ifWinNotExist, ahk_exe OBSBOT_Main.exe

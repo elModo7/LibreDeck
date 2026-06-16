@@ -5,8 +5,12 @@
 #SingleInstance Force
 #NoEnv
 SetBatchLines -1
-global buttonName = %0% 
-global buttonPath := buttonName ".ahk"
+global buttonPath = %0%
+if(SubStr(buttonPath, -3) != ".ahk")
+	buttonPath := buttonPath ".ahk"
+SplitPath, buttonPath,, buttonDir
+if(buttonDir != "")
+	FileCreateDir, %buttonDir%
 global fullFilePath, workingDir, fileName, runAsAdmin
 global switchIfExist := 1
 SkinForm(Apply, A_ScriptDir . "\lib\them.dll", A_ScriptDir . "\lib\tm")

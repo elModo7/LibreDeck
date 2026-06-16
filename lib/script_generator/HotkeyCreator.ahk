@@ -1,8 +1,12 @@
 #NoEnv
 #SingleInstance,Force
 global WindowsKey, Edt1, Edt2
-global buttonName = %0% 
-global buttonPath := buttonName ".ahk"
+global buttonPath = %0%
+if(SubStr(buttonPath, -3) != ".ahk")
+	buttonPath := buttonPath ".ahk"
+SplitPath, buttonPath,, buttonDir
+if(buttonDir != "")
+	FileCreateDir, %buttonDir%
 global delay
 SkinForm(Apply, A_ScriptDir . "\lib\them.dll", A_ScriptDir . "\lib\tm")
 OnExit, GetOut

@@ -1,10 +1,14 @@
-﻿;~ 0->No Tracking；1->Normal Tracking；2->Upper Body；3->Close-up；4->Headless；5->Lower Body；6->Desk Mode；7->Whiteboard；8->Hand；9->Group
+;~ 0->No Tracking;1->Normal Tracking;2->Upper Body;3->Close-up;4->Headless;5->Lower Body;6->Desk Mode;7->Whiteboard;8->Hand;9->Group
 #NoEnv
 #SingleInstance Force
 SetBatchLines -1
 #NoTrayIcon
-global buttonName = %0% 
-global buttonPath := buttonName ".ahk"
+global buttonPath = %0%
+if(SubStr(buttonPath, -3) != ".ahk")
+	buttonPath := buttonPath ".ahk"
+SplitPath, buttonPath,, buttonDir
+if(buttonDir != "")
+	FileCreateDir, %buttonDir%
 
 SkinForm(Apply, A_ScriptDir . "\lib\them.dll", A_ScriptDir . "\lib\tm")
 OnExit, GetOut
@@ -88,9 +92,9 @@ Generate(value)
 "#NoEnv
 #SingleInstance Force
 #NoTrayIcon
-#Include <setAhk64self>
-#Include <OBSBOTController>
-#Include <nm_msg>
+#Include %A_WorkingDir%\lib\setAhk64self.ahk
+#Include %A_WorkingDir%\lib\OBSBOTController.ahk
+#Include %A_WorkingDir%\lib\nm_msg.ahk
 SetBatchLines, -1
 DetectHiddenWindows, On
 ifWinNotExist, ahk_exe OBSBOT_Main.exe

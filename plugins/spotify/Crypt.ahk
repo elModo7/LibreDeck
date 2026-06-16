@@ -108,8 +108,8 @@ CryptAlg and hmac_alg IDs:
 =====================================================================
 
 */
-#include plugins/spotify/CryptConst.ahk
-#include plugins/spotify/CryptFoos.ahk
+#include %A_WorkingDir%\plugins\spotify\CryptConst.ahk
+#include %A_WorkingDir%\plugins\spotify\CryptFoos.ahk
 class Crypt
 {
 	class Encrypt

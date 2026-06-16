@@ -1,17 +1,21 @@
-๏ปฟ#NoEnv
+#NoEnv
 #SingleInstance Force
 SetBatchLines -1
 #NoTrayIcon
-global buttonName = %0% 
-global buttonPath := buttonName ".ahk"
+global buttonPath = %0%
+if(SubStr(buttonPath, -3) != ".ahk")
+	buttonPath := buttonPath ".ahk"
+SplitPath, buttonPath,, buttonDir
+if(buttonDir != "")
+	FileCreateDir, %buttonDir%
 
 SkinForm(Apply, A_ScriptDir . "\lib\them.dll", A_ScriptDir . "\lib\tm")
 OnExit, GetOut
 
 Gui Font, s14, Bai Jamjuree Bold
-Gui Add, Radio, x8 y8 w191 h48 Checked vfov86, 86ยบ
-Gui Add, Radio, x8 y64 w191 h48 vfov78, 78ยบ
-Gui Add, Radio, x8 y120 w191 h48 vfov65, 65ยบ
+Gui Add, Radio, x8 y8 w191 h48 Checked vfov86, 86บ
+Gui Add, Radio, x8 y64 w191 h48 vfov78, 78บ
+Gui Add, Radio, x8 y120 w191 h48 vfov65, 65บ
 
 Gui Show, w207 h176, OBSBOT Set FOV
 Return
@@ -60,9 +64,9 @@ Generate(value)
 "#NoEnv
 #SingleInstance Force
 #NoTrayIcon
-#Include <setAhk64self>
-#Include <OBSBOTController>
-#Include <nm_msg>
+#Include %A_WorkingDir%\lib\setAhk64self.ahk
+#Include %A_WorkingDir%\lib\OBSBOTController.ahk
+#Include %A_WorkingDir%\lib\nm_msg.ahk
 SetBatchLines, -1
 DetectHiddenWindows, On
 ifWinNotExist, ahk_exe OBSBOT_Main.exe

@@ -1,34 +1,34 @@
-﻿ScriptGenerator_Multimedia_PlayPause:
+ScriptGenerator_Multimedia_PlayPause:
 	if(ComprobarExistenciaBoton())
-		FileCopy, lib\script_generator\code_snippets\ScriptGenerator_Multimedia_PlayPause.ahk,%BotonActivo%.ahk,1
+		CopyScriptToButton("lib\script_generator\code_snippets\ScriptGenerator_Multimedia_PlayPause.ahk")
 return
 
 ScriptGenerator_Multimedia_Stop:
 	if(ComprobarExistenciaBoton())
-		FileCopy, lib\script_generator\code_snippets\ScriptGenerator_Multimedia_Stop.ahk,%BotonActivo%.ahk,1
+		CopyScriptToButton("lib\script_generator\code_snippets\ScriptGenerator_Multimedia_Stop.ahk")
 return
 
 ScriptGenerator_Multimedia_Next:
 	if(ComprobarExistenciaBoton())
-		FileCopy, lib\script_generator\code_snippets\ScriptGenerator_Multimedia_Next.ahk,%BotonActivo%.ahk,1
+		CopyScriptToButton("lib\script_generator\code_snippets\ScriptGenerator_Multimedia_Next.ahk")
 return
 
 ScriptGenerator_Multimedia_Previous:
 	if(ComprobarExistenciaBoton())
-		FileCopy, lib\script_generator\code_snippets\ScriptGenerator_Multimedia_Previous.ahk,%BotonActivo%.ahk,1
+		CopyScriptToButton("lib\script_generator\code_snippets\ScriptGenerator_Multimedia_Previous.ahk")
 return
 
 ScriptGenerator_Multimedia_MoreVolume:
 	if(ComprobarExistenciaBoton())
-		FileCopy, lib\script_generator\code_snippets\ScriptGenerator_Multimedia_MoreVolume.ahk,%BotonActivo%.ahk,1
+		CopyScriptToButton("lib\script_generator\code_snippets\ScriptGenerator_Multimedia_MoreVolume.ahk")
 return
 
 ScriptGenerator_Multimedia_LessVolume:
 	if(ComprobarExistenciaBoton())
-		FileCopy, lib\script_generator\code_snippets\ScriptGenerator_Multimedia_LessVolume.ahk,%BotonActivo%.ahk,1
+		CopyScriptToButton("lib\script_generator\code_snippets\ScriptGenerator_Multimedia_LessVolume.ahk")
 return
 
 ScriptGenerator_Multimedia_Mute:
 	if(ComprobarExistenciaBoton())
-		FileCopy, lib\script_generator\code_snippets\ScriptGenerator_Multimedia_Mute.ahk,%BotonActivo%.ahk,1
+		CopyScriptToButton("lib\script_generator\code_snippets\ScriptGenerator_Multimedia_Mute.ahk")
 return

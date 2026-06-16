@@ -714,7 +714,7 @@ class user {
 	}
 }
 
-#Include plugins/spotify/AHKsock.ahk
-#Include plugins/spotify/AHKhttp.ahk
-#Include plugins/spotify/crypt.ahk
-#Include plugins/spotify/json.ahk
+#Include %A_WorkingDir%\plugins\spotify\AHKsock.ahk
+#Include %A_WorkingDir%\plugins\spotify\AHKhttp.ahk
+#Include %A_WorkingDir%\plugins\spotify\crypt.ahk
+#Include %A_WorkingDir%\plugins\spotify\json.ahk

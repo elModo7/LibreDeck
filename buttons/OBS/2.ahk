@@ -2,8 +2,9 @@
 #NoTrayIcon
 #SingleInstance, Force
 SetBatchLines, -1
-#Include, <nm_msg>
+#Include %A_WorkingDir%\lib\nm_msg.ahk
 DetectHiddenWindows, On
+global willDelete := false
 IfWinNotExist, ahk_exe obs64.exe
 {
 	nmMsg("OBS Not Detected!",2)
@@ -33,13 +34,18 @@ class LlamadaWS extends WebSocket
 		{
 		  "op": 6,
 		  "d": {
-			"requestType": "PauseRecord",
+			"requestType": "StopRecord",
 			"requestId": "f819dcf0-89cc-11eb-8f0e-382c4ac93b9c"
 		  }
 		}
 		)
 		this.Send(Command)
-		nmMsg("Recording paused")
+		nmMsg("Recording stopped")
+		MsgBox 0x34, Keep Video?, Do you want to keep last video you recorded?
+
+		IfMsgBox No, {
+			willDelete := true
+		}
 	}
 
 	OnMessage(Event)
@@ -51,6 +57,17 @@ class LlamadaWS extends WebSocket
 	OnClose(Event)
 	{
 		this.Disconnect()
+		if (willDelete) {
+			Loop, Files, V:\VIDEO\*.mp4
+			{
+				if(newest < A_LoopFileTimeCreated)
+				{
+					newest := A_LoopFileTimeCreated
+					fileToDelete := A_LoopFileFullPath
+				}
+			}
+			FileDelete, %fileToDelete%
+		}
 		ExitApp
 	}
 

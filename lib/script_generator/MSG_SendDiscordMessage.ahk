@@ -2,8 +2,12 @@
 #NoEnv
 #SingleInstance Force
 SetBatchLines -1
-global buttonName = %0% 
-global buttonPath := buttonName ".ahk"
+global buttonPath = %0%
+if(SubStr(buttonPath, -3) != ".ahk")
+	buttonPath := buttonPath ".ahk"
+SplitPath, buttonPath,, buttonDir
+if(buttonDir != "")
+	FileCreateDir, %buttonDir%
 SkinForm(Apply, A_ScriptDir . "\lib\them.dll", A_ScriptDir . "\lib\tm")
 OnExit, GetOut
 Gui Add, Text, x32 y10 w80 h23 +0x200, Webhook URL:
@@ -13,7 +17,7 @@ Gui Add, Edit, x32 y65 w300 h200 vmsg
 Gui, Font, Bold
 Gui Add, Button, x230 y270 w100 h23, Create Button
 Gui Show, w339 h300, New Discord MSG
-wh_url := "https://discord.com/api/webhooks/<your-webhook-api-here>"
+wh_url := "https://discord.com/api/webhooks/<YOUR_WEBHOOK_HERE>"
 return
 
 

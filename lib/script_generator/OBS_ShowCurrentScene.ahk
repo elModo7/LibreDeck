@@ -1,9 +1,9 @@
-﻿; Muestra la escena actual
+; Muestra la escena actual
 #NoEnv
 #NoTrayIcon
 #SingleInstance, Force
 SetBatchLines, -1
-#Include, <nm_msg>
+#Include %A_WorkingDir%\lib\nm_msg.ahk
 DetectHiddenWindows, On
 IfWinNotExist, ahk_exe obs64.exe
 {

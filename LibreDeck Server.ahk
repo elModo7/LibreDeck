@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Server
 ;@Ahk2Exe-SetDescription Macro Panel Server
-;@Ahk2Exe-SetVersion 0.4.6
+;@Ahk2Exe-SetVersion 0.5.0
 ;@Ahk2Exe-SetCopyright 2026`, elModo7
 ;@Ahk2Exe-SetOrigFilename LibreDeck Server.exe
 ; INITIALIZE
@@ -11,7 +11,7 @@
 SetBatchLines, -1
 #NoEnv
 #Persistent
-global versionNumber := "0.4.6"
+global versionNumber := "0.5.0"
 global clientVersion := versionNumber " - elModo7 / VictorDevLog " A_YYYY
 #Include <Socket>
 #Include <JSON>
@@ -134,18 +134,29 @@ OnTCPRecvServer(this)
     try
     {
         Client.sendText(data.BotonVisual)
-        if(FileExist(data.FicheroEjecutar))
+        scriptPath := ResolveButtonScriptPath(data.FicheroEjecutar)
+        if(scriptPath != "" && FileExist(scriptPath))
         {
             if(conf.builtin_ahk)
 			{
-                Run, % A_ScriptDir "\lib\autohotkey.exe " data.FicheroEjecutar
+                Run, % A_ScriptDir "\lib\autohotkey.exe """ scriptPath """", % A_ScriptDir
 			}
 			else
 			{
-                Run, % data.FicheroEjecutar
+                Run, % """" scriptPath """", % A_ScriptDir
 			}
         }
     }
+}
+
+ResolveButtonScriptPath(scriptPath)
+{
+	StringReplace, scriptPath, scriptPath, /, \, All
+	if(scriptPath = "")
+		return ""
+	if(InStr(scriptPath, "..") || InStr(scriptPath, ":") || SubStr(scriptPath, 1, 8) != "buttons\" || SubStr(scriptPath, -3) != ".ahk")
+		return ""
+	return A_ScriptDir "\" scriptPath
 }
 
 OnTCPAccept(this)

@@ -1,9 +1,13 @@
-﻿#NoEnv
+#NoEnv
 #SingleInstance Force
 SetBatchLines -1
 #NoTrayIcon
-global buttonName = %0% 
-global buttonPath := buttonName ".ahk"
+global buttonPath = %0%
+if(SubStr(buttonPath, -3) != ".ahk")
+	buttonPath := buttonPath ".ahk"
+SplitPath, buttonPath,, buttonDir
+if(buttonDir != "")
+	FileCreateDir, %buttonDir%
 if FileExist(buttonPath)
 {
 	OnMessage(0x44, "OnMsgBox")
@@ -28,9 +32,9 @@ Generate()
 "#NoEnv
 #SingleInstance Force
 #NoTrayIcon
-#Include <setAhk64self>
-#Include <OBSBOTController>
-#Include <nm_msg>
+#Include %A_WorkingDir%\lib\setAhk64self.ahk
+#Include %A_WorkingDir%\lib\OBSBOTController.ahk
+#Include %A_WorkingDir%\lib\nm_msg.ahk
 SetBatchLines, -1
 DetectHiddenWindows, On
 ifWinNotExist, ahk_exe OBSBOT_Main.exe

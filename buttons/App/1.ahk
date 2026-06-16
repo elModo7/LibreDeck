@@ -4,7 +4,7 @@ SetBatchLines, -1
 #NoTrayIcon
 SetWorkingDir C:\Windows\System32
 
-global Executable := "mspaint.exe"
+global Executable := "calc.exe"
 
 IfWinExist, ahk_exe %Executable%
 {
@@ -12,5 +12,5 @@ IfWinExist, ahk_exe %Executable%
 }
 else
 {
-	Run, "C:\Windows\System32\mspaint.exe"
+	Run, "C:\Windows\System32\calc.exe"
 }

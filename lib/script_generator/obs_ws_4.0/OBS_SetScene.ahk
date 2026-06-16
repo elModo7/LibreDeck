@@ -1,8 +1,12 @@
-﻿#NoEnv
+#NoEnv
 #SingleInstance Force
 SetBatchLines -1
-global buttonName = %0% 
-global buttonPath := buttonName ".ahk"
+global buttonPath = %0%
+if(SubStr(buttonPath, -3) != ".ahk")
+	buttonPath := buttonPath ".ahk"
+SplitPath, buttonPath,, buttonDir
+if(buttonDir != "")
+	FileCreateDir, %buttonDir%
 SkinForm(Apply, A_ScriptDir . "\lib\them.dll", A_ScriptDir . "\lib\tm")
 OnExit, GetOut
 
@@ -55,7 +59,7 @@ Generar(nombreEscena)
 #NoTrayIcon
 #SingleInstance, Force
 SetBatchLines, -1
-#Include, <nm_msg>
+#Include %A_WorkingDir%\lib\nm_msg.ahk
 DetectHiddenWindows, On
 IfWinNotExist, ahk_exe obs64.exe
 {
