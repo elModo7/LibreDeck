@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 4.0.0
+;@Ahk2Exe-SetVersion 4.0.1
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -53,7 +53,7 @@ SetBatchLines, -1
 #Include <talk>
 #Include <plugin_system>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "4.0.0"
+global ClientVersionNumber := "4.0.1"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -1259,6 +1259,9 @@ DeleteFolderButton:
 		IfMsgBox Yes, {
 			if(conf.folderButtons[BotonActivo] != "")
 			{
+				FileRemoveDir, % A_ScriptDir "\buttons\" conf.folderButtons[BotonActivo], 1
+				FileRemoveDir, % A_ScriptDir "\resources\img\" conf.folderButtons[BotonActivo], 1
+				/*
 				Loop, Files, % A_ScriptDir "\buttons\" conf.folderButtons[BotonActivo] "\*.ahk"
 				{
 					FileDelete, % A_LoopFileFullPath
@@ -1267,6 +1270,7 @@ DeleteFolderButton:
 				{
 					FileDelete, % A_LoopFileFullPath
 				}
+				*/
 			}
 		}
 		conf.folderButtons.delete(BotonActivo) 
