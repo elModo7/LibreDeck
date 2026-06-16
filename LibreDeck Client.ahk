@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 4.0.1
+;@Ahk2Exe-SetVersion 4.0.2
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -52,8 +52,9 @@ SetBatchLines, -1
 #Include <aboutScreen>
 #Include <talk>
 #Include <plugin_system>
+#Include <LibreDeckButtonImage>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "4.0.1"
+global ClientVersionNumber := "4.0.2"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -73,6 +74,11 @@ FileCreateDir, buttons
 global btnPics := {}
 GuiControl, splashScreen:, splashTxt, % "Reading config..."
 contextcolor(2) ;0=Default ;1=AllowDark ;2=ForceDark ;3=ForceLight ;4=Max
+
+; Image Generator
+outDir := A_ScriptDir "\resources\img"
+FileCreateDir, %outDir%
+LD_ButtonImage_Start()
 
 ; Talk (WM_COPYDATA) params
 global incomingNotification := {"text": "", "duration": 1000, "region": "top"} ; Notification System
@@ -250,6 +256,8 @@ Menu ContextMenu, Add, Script Generator`tAlt + Right Click, :scriptGenerator
 Menu ContextMenu, Icon, Script Generator`tAlt + Right Click, shell32.dll, 85
 Menu ContextMenu, Add, Change/Del Image`tCtrl + Shift + Click, GuiCambiarImagenBoton
 Menu ContextMenu, Icon, Change/Del Image`tCtrl + Shift + Click, shell32.dll, 142
+Menu ContextMenu, Add, Generate Default Image, GuiGenerarImagenBoton
+Menu ContextMenu, Icon, Generate Default Image, shell32.dll, 135
 Menu ContextMenu, Add, Button Name`tCtrl + Click, GuiInfoBoton
 Menu ContextMenu, Icon, Button Name`tCtrl + Click, shell32.dll, 24
 Menu ContextMenu, Add, Create Folder Button, CreateFolderButton
@@ -417,6 +425,10 @@ return
 
 GuiCambiarImagenBoton:
 	EstablecerImagenBoton(BotonActivo)
+return
+
+GuiGenerarImagenBoton:
+	GenerarImagenBotonDefault(BotonActivo)
 return
 
 GuiInfoBoton:
@@ -1045,6 +1057,71 @@ EstablecerImagenBoton(IdBoton)
 	}
 }
 
+GenerarImagenBotonDefault(IdBoton)
+{
+	global btnPics
+	InputBox, buttonImageType, Button Image Type, Insert action type`nExamples`: MACRO`, OBS`, APP`, HOTKEY, , 420, 145,,,,,MACRO
+	if(ErrorLevel)
+		return
+	buttonImageType := Trim(buttonImageType)
+	if(buttonImageType = "")
+		buttonImageType := "MACRO"
+
+	InputBox, buttonImageTitle, Button Image Title, Insert main button title`nExamples`: Record`, Mute Mic`, Browser, , 420, 145,,,,,Example
+	if(ErrorLevel)
+		return
+	buttonImageTitle := Trim(buttonImageTitle)
+	if(buttonImageTitle = "")
+	{
+		MsgBox, Button title can not be empty.
+		return
+	}
+
+	InputBox, buttonImageSubtitle, Button Image Subtitle, Insert short description`nExamples`: LibreDeck`, OBS`, Spotify, , 420, 145,,,,,LibreDeck
+	if(ErrorLevel)
+		return
+	buttonImageSubtitle := Trim(buttonImageSubtitle)
+	if(buttonImageSubtitle = "")
+		buttonImageSubtitle := "LibreDeck"
+
+	outDir := A_ScriptDir "\resources\img"
+	FileCreateDir, %outDir%
+	imageName := IdBoton ".png"
+	imagePath := outDir "\" imageName
+
+	if(FileExist(imagePath))
+	{
+		OnMessage(0x44, "OnMsgBox")
+		MsgBoxBtn1 = Overwrite
+		MsgBoxBtn2 = Cancel
+		MsgBox 0x34, Overwrite Image?, This button already has an image`, do you want to overwrite it?
+		OnMessage(0x44, "")
+		IfMsgBox No, {
+			return
+		}
+	}
+
+	DllCall("DeleteObject", "ptr", btnPics[imageName])
+	btnPics[imageName] := ""
+	FileDelete, %imagePath%
+
+	if(!LD_ButtonImage_Render(imagePath, {style:"minimal", title:buttonImageType, value:buttonImageTitle, subtitle:buttonImageSubtitle}))
+	{
+		MsgBox,,Error, Could not generate button image.
+		return
+	}
+
+	btnPics[imageName] := LoadPicture(imagePath)
+	if(EnCarpeta)
+	{
+		EstablecerPaginaCarpeta(CarpetaBoton, PaginaCarpeta)
+	}
+	else
+	{
+		EstablecerPagina(NumeroPagina)
+	}
+}
+
 GetButtonScriptRelativePath(IdBoton, extension = "")
 {
 	global conf
@@ -1444,6 +1521,7 @@ SkinForm(Param1 = "Apply", DLL = "", SkinName = ""){
 
 GetOut:
 	SkinForm(0)
+	LD_ButtonImage_Shutdown()
     ExitApp
 
 
