@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 4.0.4
+;@Ahk2Exe-SetVersion 4.0.5
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -54,7 +54,7 @@ SetBatchLines, -1
 #Include <plugin_system>
 #Include <LibreDeckButtonImage>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "4.0.4"
+global ClientVersionNumber := "4.0.5"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -1831,7 +1831,14 @@ return
 
 setButtonIcon(buttonId, imagePathOrName) {
 	global
-	GuiControl, Text, Boton%buttonId%, % btnPics[imagePathOrName] ? "HBITMAP:*" btnPics[imagePathOrName] : imagePathOrName
+	if(EnCarpeta){
+		curBtn := CarpetaBoton 15*PaginaCarpeta+buttonId ".png"
+	}
+	else
+		curBtn := CarpetaBoton 15*NumeroPagina+buttonId ".png"
+	
+	btnPics[curBtn] := LoadPicture(imagePathOrName)
+	GuiControl, Text, Boton%buttonId%, % btnPics[curBtn] ? "HBITMAP:*" btnPics[curBtn] : imagePathOrName
 	if(conf.miniClient)
 		GuiControl, MoveDraw, Boton%buttonId%, w49 h49
 	else
