@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 4.0.5
+;@Ahk2Exe-SetVersion 4.0.7
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -54,7 +54,7 @@ SetBatchLines, -1
 #Include <plugin_system>
 #Include <LibreDeckButtonImage>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "4.0.5"
+global ClientVersionNumber := "4.0.7"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -1095,6 +1095,18 @@ GenerarImagenBotonDefault(IdBoton)
 	buttonImageStyle := GenerarImagenBotonDefaultSeleccionarEstilo()
 	if(buttonImageStyle = "")
 		return
+	
+	if (buttonImageStyle == "image") {
+		FileSelectFile, imageSelected, 3,, Select image, *.png; *.jpg; *.jpeg; *.bmp; *.gif; *.ico
+		if (!ErrorLevel) {
+			buttonImagePath := imageSelected
+			buttonImageFit := "cover" ; cover | contain | stretch
+		} else {
+			MsgBox,,Error, Could not generate button image.
+			return
+		}
+	}
+	
 	Gui, 1:Default
 
 	outDir := A_ScriptDir "\resources\img"
@@ -1118,10 +1130,18 @@ GenerarImagenBotonDefault(IdBoton)
 	btnPics[imageName] := ""
 	FileDelete, %imagePath%
 
-	if(!LD_ButtonImage_Render(imagePath, {style:buttonImageStyle, title:buttonImageType, value:buttonImageTitle, subtitle:buttonImageSubtitle}))
-	{
-		MsgBox,,Error, Could not generate button image.
-		return
+	if (buttonImageStyle == "image") {
+		if(!LD_ButtonImage_Render(imagePath, {style:buttonImageStyle, imagePath:buttonImagePath, imageFit:buttonImageFit, title:buttonImageType, subtitle:buttonImageSubtitle}))
+		{
+			MsgBox,,Error, Could not generate button image.
+			return
+		}
+	} else {
+		if(!LD_ButtonImage_Render(imagePath, {style:buttonImageStyle, title:buttonImageType, value:buttonImageTitle, subtitle:buttonImageSubtitle}))
+		{
+			MsgBox,,Error, Could not generate button image.
+			return
+		}
 	}
 
 	btnPics[imageName] := LoadPicture(imagePath)
@@ -1175,7 +1195,7 @@ GenerarImagenBotonDefaultSeleccionarEstilo()
 	Gui, ButtonImageStyle:New, +AlwaysOnTop +ToolWindow +OwnDialogs, Button Image Style
 	Gui, ButtonImageStyle:Margin, 12, 12
 	Gui, ButtonImageStyle:Add, Text, w260, Choose button image style:
-	Gui, ButtonImageStyle:Add, DropDownList, vLD_ButtonImage_SelectedStyle w260 Choose6, neon|resident|warning|pokemon|glass|minimal
+	Gui, ButtonImageStyle:Add, DropDownList, vLD_ButtonImage_SelectedStyle w260 Choose6, neon|resident|warning|pokemon|glass|minimal|image
 	Gui, ButtonImageStyle:Add, Button, x70 y80 w80 Default gButtonImageStyleOK, OK
 	Gui, ButtonImageStyle:Add, Button, x160 y80 w80 gButtonImageStyleCancel, Cancel
 	Gui, ButtonImageStyle:Show,, Button Image Style
@@ -1837,6 +1857,8 @@ setButtonIcon(buttonId, imagePathOrName) {
 	else
 		curBtn := CarpetaBoton 15*NumeroPagina+buttonId ".png"
 	
+	if (btnPics[curBtn]) 
+		DllCall("DeleteObject", "ptr", btnPics[curBtn]) ; Dispose image from memory
 	btnPics[curBtn] := LoadPicture(imagePathOrName)
 	GuiControl, Text, Boton%buttonId%, % btnPics[curBtn] ? "HBITMAP:*" btnPics[curBtn] : imagePathOrName
 	if(conf.miniClient)
