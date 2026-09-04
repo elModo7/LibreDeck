@@ -63,7 +63,7 @@ A file named ***"LibreDeck Client.exe"*** will apear, run that file. Done!
     - Shuffle Mode Toggle
     - Repeat Toggle
     - Volume Up / Down 
-- **Touchscreen** support
+- **Touchscreen** oriented
 - **Portable**
 - **Plugin System**
 - **Notification System**
@@ -72,6 +72,7 @@ A file named ***"LibreDeck Client.exe"*** will apear, run that file. Done!
 - **Reactive pages** (enables auto page change based on active program)
 - Quick Resource Pack generation
 - One-Key Complete Backup
+- LibreDeck network server auto discovery
 
 **Requires:**
 
