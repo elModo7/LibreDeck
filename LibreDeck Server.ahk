@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Server
 ;@Ahk2Exe-SetDescription Macro Panel Server
-;@Ahk2Exe-SetVersion 0.5.0
+;@Ahk2Exe-SetVersion 0.6.0
 ;@Ahk2Exe-SetCopyright 2026`, elModo7
 ;@Ahk2Exe-SetOrigFilename LibreDeck Server.exe
 ; INITIALIZE
@@ -11,9 +11,15 @@
 SetBatchLines, -1
 #NoEnv
 #Persistent
-global versionNumber := "0.5.0"
+global versionNumber := "0.6.0"
 global clientVersion := versionNumber " - elModo7 / VictorDevLog " A_YYYY
+global LD_ServerDiscoverySock := -1
+global LD_ServerDiscoverySocketCallback := ""
+global LD_ServerDiscoveryWinsockStarted := false
+global LD_SERVER_DISCOVERY_SOCKET_MSG := 0x9988
+global LD_SERVER_DISCOVERY_FD_READ := 1
 #Include <Socket>
+#Include <LibreDeckDiscovery>
 #Include <JSON>
 #Include <MD5>
 #Include <SplashScreen>
@@ -86,6 +92,7 @@ global myTcp := new SocketTCP()
 myTcp.bind("0.0.0.0", conf.port)
 myTcp.listen() ; Escucha
 myTcp.onAccept := Func("OnTCPAccept")
+StartLibreDeckDiscoveryServer()
 Gui, SplashScreen:Destroy
 Return
 
@@ -120,6 +127,7 @@ return
 
 OnExit, Exit
 Exit:
+	StopLibreDeckDiscoveryServer(true)
 	gosub, killPreviousInstance
 ExitApp
 
@@ -165,6 +173,82 @@ OnTCPAccept(this)
     Client := this.accept()
     Client.onRecv := func("OnTCPRecvServer")
     Client.sendText("LibreDeck Server")
+}
+
+StartLibreDeckDiscoveryServer()
+{
+	global LD_ServerDiscoverySock, LD_ServerDiscoverySocketCallback, LD_ServerDiscoveryWinsockStarted
+	global LD_SERVER_DISCOVERY_SOCKET_MSG, LD_SERVER_DISCOVERY_FD_READ
+
+	if(!LD_ServerDiscoveryWinsockStarted)
+	{
+		if(!LD_StartWinsock())
+			return false
+		LD_ServerDiscoveryWinsockStarted := true
+	}
+
+	LD_ServerDiscoverySock := LD_CreateUdpSocket()
+	if(LD_ServerDiscoverySock = -1)
+		return false
+	if(!LD_Bind(LD_ServerDiscoverySock, 37921))
+	{
+		LD_CloseSocket(LD_ServerDiscoverySock)
+		LD_ServerDiscoverySock := -1
+		return false
+	}
+
+	if(LD_ServerDiscoverySocketCallback = "")
+		LD_ServerDiscoverySocketCallback := Func("LibreDeckDiscoveryServerSocketMessage")
+	OnMessage(LD_SERVER_DISCOVERY_SOCKET_MSG, LD_ServerDiscoverySocketCallback)
+	if(!LD_RegisterAsync(LD_ServerDiscoverySock, LD_SERVER_DISCOVERY_SOCKET_MSG, LD_SERVER_DISCOVERY_FD_READ))
+	{
+		OnMessage(LD_SERVER_DISCOVERY_SOCKET_MSG, LD_ServerDiscoverySocketCallback, 0)
+		LD_CloseSocket(LD_ServerDiscoverySock)
+		LD_ServerDiscoverySock := -1
+		return false
+	}
+	return true
+}
+
+StopLibreDeckDiscoveryServer(cleanWinsock := false)
+{
+	global LD_ServerDiscoverySock, LD_ServerDiscoverySocketCallback, LD_ServerDiscoveryWinsockStarted, LD_SERVER_DISCOVERY_SOCKET_MSG
+
+	if(LD_ServerDiscoverySock != -1)
+	{
+		if(LD_ServerDiscoverySocketCallback != "")
+			OnMessage(LD_SERVER_DISCOVERY_SOCKET_MSG, LD_ServerDiscoverySocketCallback, 0)
+		LD_UnregisterAsync(LD_ServerDiscoverySock, LD_SERVER_DISCOVERY_SOCKET_MSG)
+		LD_CloseSocket(LD_ServerDiscoverySock)
+		LD_ServerDiscoverySock := -1
+	}
+	if(cleanWinsock && LD_ServerDiscoveryWinsockStarted)
+	{
+		DllCall("Ws2_32\WSACleanup")
+		LD_ServerDiscoveryWinsockStarted := false
+	}
+}
+
+LibreDeckDiscoveryServerSocketMessage(wParam, lParam, msg, hwnd)
+{
+	global LD_ServerDiscoverySock, LD_SERVER_DISCOVERY_FD_READ, conf, versionNumber
+
+	if(wParam != LD_ServerDiscoverySock)
+		return
+	if(LD_AsyncError(lParam))
+		return
+	if(LD_AsyncEvent(lParam) != LD_SERVER_DISCOVERY_FD_READ)
+		return
+
+	received := LD_RecvOne(LD_ServerDiscoverySock, message, ip, port, fromAddr)
+	if(received = -1)
+		return
+
+	if(InStr(message, "LIBREDECK_DISCOVER") = 1)
+	{
+		response := "LIBREDECK_SERVER|version=" versionNumber "|name=" A_ComputerName "|tcp_port=" conf.port "|resource_port=" conf.resourceSharePort
+		LD_SendToAddr(LD_ServerDiscoverySock, response, fromAddr)
+	}
 }
 
 7zImageButtons:

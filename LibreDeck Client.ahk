@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 4.0.7
+;@Ahk2Exe-SetVersion 4.1.0
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -31,6 +31,7 @@ LATEST CHANGES:
 - Add remote icon, background changes (3.8.1+)
 - Add spotify integration (3.8.2+) -> https://github.com/CloakerSmoker/Spotify.ahk
 - Add proper button folders
+- Add dynamic discovery (4.1.0+)
 
 COMMENTS:
 - This script is one of my very first AutoHotkey scripts (Jun 2017), it can be improved A LOT, code quality wise (starting from keeping it consistent with a single language instead of Spanglish). However, I use it on a day to day basis and it is "robust enough" and convenient that I make heavy use of it, even above any other Hotkey, Dedicated Keyboard, Macro Deck, StreamDock or Android solutions I currently have purchased.
@@ -47,6 +48,7 @@ SetBatchLines, -1
 #Include, <JSON>
 #Include <SplashScreen>
 #Include <Socket>
+#Include <LibreDeckDiscovery>
 #Include <util>
 #Include <client_updater>
 #Include <aboutScreen>
@@ -54,7 +56,7 @@ SetBatchLines, -1
 #Include <plugin_system>
 #Include <LibreDeckButtonImage>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "4.0.7"
+global ClientVersionNumber := "4.1.0"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -65,6 +67,20 @@ global feedbackEjecucion := []
 global plugins := []
 global LD_ScriptGeneratorMenuHandlers := {}
 global LD_ScriptGeneratorMenus := {}
+global LD_DiscoveryServers := {}
+global LD_DiscoveryInterfaces := {}
+global LD_DiscoverySock := -1
+global LD_DiscoverySocketCallback := ""
+global LD_DiscoveryWinsockStarted := false
+global LD_DiscoveryDiscovering := false
+global LD_DiscoveryPort := 37921
+global LD_DiscoveryLocalUdpPort := 0
+global LD_DiscoveryLocalIP := ""
+global LD_DiscoveryBroadcastIP := ""
+global LD_DISCOVERY_SOCKET_MSG := 0x9989
+global LD_DISCOVERY_FD_READ := 1
+global LD_DISCOVERY_TIMEOUT_MS := 1200
+global LD_NetworkConfigSkipReload := false
 global NumeroPagina := 0
 global serverFound := 0
 global reactiveWindow := 0
@@ -1621,6 +1637,7 @@ SkinForm(Param1 = "Apply", DLL = "", SkinName = ""){
 
 GetOut:
 	SkinForm(0)
+	LibreDeckDiscoveryShutdown()
 	LD_ButtonImage_Shutdown()
     ExitApp
 
@@ -1653,6 +1670,7 @@ crearGuiNetworkSettings:
 	}
 	else
 	{
+		interfaceList := LibreDeckDiscoveryBuildInterfaceList()
 		if(conf.online)
 			Gui networkSettings:Add, CheckBox, x16 y8 w120 h23 vOnlineChk checked, Online Mode
 		else
@@ -1665,9 +1683,30 @@ crearGuiNetworkSettings:
 		Gui networkSettings:Add, Edit, +Center x64 y104 w120 h21 vResourcesPortTxt, % conf.resourcesPort
 		Gui networkSettings:Add, Button, x16 y136 w80 h23 gSaveNetworkConfig, SAVE CONFIG
 		Gui networkSettings:Add, Button, x104 y136 w80 h23 gConnectToServer, CONNECT
-		Gui networkSettings:Add, Text, x0 y168 w214 h2 +0x10 ; Separator
-		Gui networkSettings:Add, Text, x8 y169 w191 h23 +Center +0x200 vNetworkStatusInfo, LibreDeck - Network Config
-		Gui networkSettings:Show, w208 h192, LibreDeck Network Settings
+		Gui networkSettings:Add, Text, x0 y168 w548 h2 +0x10 ; Separator
+		Gui networkSettings:Add, Text, x16 y180 w95 h23 +0x200, Interface:
+		Gui networkSettings:Add, DropDownList, x88 y180 w445 vDiscoveryInterfaceChoice gNetworkDiscoveryInterfaceChanged, %interfaceList%
+		Gui networkSettings:Add, Text, x16 y212 w95 h23 +0x200, Broadcast:
+		Gui networkSettings:Add, Edit, +Center x88 y212 w145 h21 vDiscoveryBroadcastTxt ReadOnly
+		Gui networkSettings:Add, Text, x248 y212 w80 h23 +0x200, UDP:
+		Gui networkSettings:Add, Edit, +Center x285 y212 w70 h21 vDiscoveryPortTxt Number, % LD_DiscoveryPort
+		Gui networkSettings:Add, Text, x368 y212 w72 h23 +0x200, Local UDP:
+		Gui networkSettings:Add, Edit, +Center x436 y212 w55 h21 vDiscoveryLocalUdpPortTxt Number, % LD_DiscoveryLocalUdpPort
+		Gui networkSettings:Add, Button, x16 y244 w110 h23 gNetworkDiscoveryRefresh, DISCOVER
+		Gui networkSettings:Add, Text, x136 y244 w397 h23 +0x200 vNetworkDiscoveryStatus, Discovery ready
+		Gui networkSettings:Add, ListView, x16 y276 w517 h150 vNetworkDiscoveryServerList gNetworkDiscoveryServerSelected, Name|IP|Port|Res|Ver|Last Seen
+		Gui networkSettings:Add, Text, x0 y438 w548 h2 +0x10 ; Separator
+		Gui networkSettings:Add, Text, x8 y439 w525 h23 +Center +0x200 vNetworkStatusInfo, LibreDeck - Network Config
+		Gui networkSettings:Default
+		LV_ModifyCol(1, 145)
+		LV_ModifyCol(2, 115)
+		LV_ModifyCol(3, 55)
+		LV_ModifyCol(4, 55)
+		LV_ModifyCol(5, 45)
+		LV_ModifyCol(6, 85)
+		Gui networkSettings:Show, w548 h466, LibreDeck Network Settings
+		gosub, NetworkDiscoveryInterfaceChanged
+		gosub, NetworkDiscoveryRefresh
 	}
 Return
 
@@ -1681,6 +1720,8 @@ SaveNetworkConfig:
 	{
 		mustReload := 1
 	}
+	if(LD_NetworkConfigSkipReload)
+		mustReload := 0
 	gosub, loadConfig ; This is needed because when we are online, folder config is the remote server's config, and we don't want to keep it when we switch back to local mode
 	conf.online := OnlineChk
 	conf.ip := IpTxt
@@ -1729,8 +1770,344 @@ return
 
 networkSettingsguiClose:
 networkSettingsguiEscape:
+	StopLibreDeckDiscoveryClient()
 	Gui, networkSettings:Destroy
 return
+
+NetworkDiscoveryInterfaceChanged:
+	Gui, networkSettings:Submit, NoHide
+	if(!LD_DiscoveryInterfaces.HasKey(DiscoveryInterfaceChoice))
+		return
+	selected := LD_DiscoveryInterfaces[DiscoveryInterfaceChoice]
+	LD_DiscoveryBroadcastIP := LibreDeckDiscoveryCalculateBroadcast(selected.ip, selected.mask)
+	GuiControl, networkSettings:, DiscoveryBroadcastTxt, %LD_DiscoveryBroadcastIP%
+return
+
+NetworkDiscoveryRefresh:
+	Gui, networkSettings:Submit, NoHide
+	if(LD_DiscoveryDiscovering)
+		return
+	if(!LibreDeckDiscoveryApplyClientSettings())
+		return
+
+	LD_DiscoveryDiscovering := true
+	LD_DiscoveryServers := {}
+	Gui, networkSettings:Default
+	LV_Delete()
+	GuiControl, networkSettings:, NetworkDiscoveryStatus, % "Discovering " LD_DiscoveryBroadcastIP "..."
+
+	message := "LIBREDECK_DISCOVER|name=" A_ComputerName
+	sent := LD_SendToIP(LD_DiscoverySock, message, LD_DiscoveryBroadcastIP, LD_DiscoveryPort)
+	if(sent = -1)
+	{
+		err := LD_GetLastError()
+		GuiControl, networkSettings:, NetworkDiscoveryStatus, sendto error %err%
+		LD_DiscoveryDiscovering := false
+		return
+	}
+	SetTimer, NetworkDiscoveryFinish, % -LD_DISCOVERY_TIMEOUT_MS
+return
+
+NetworkDiscoveryFinish:
+	LD_DiscoveryDiscovering := false
+	Gui, networkSettings:Default
+	count := LV_GetCount()
+	GuiControl, networkSettings:, NetworkDiscoveryStatus, Found %count% server(s)
+return
+
+NetworkDiscoveryServerSelected:
+	if(A_GuiEvent != "Normal" && A_GuiEvent != "DoubleClick")
+		return
+	row := A_EventInfo
+	if(!row)
+		return
+	NetworkDiscoveryFillConnectionForm(row)
+	if(A_GuiEvent = "DoubleClick")
+	{
+		LD_NetworkConfigSkipReload := true
+		gosub, ConnectToServer
+		LD_NetworkConfigSkipReload := false
+	}
+return
+
+LibreDeckDiscoveryApplyClientSettings()
+{
+	global LD_DiscoveryInterfaces, LD_DiscoveryPort, LD_DiscoveryLocalUdpPort, LD_DiscoveryLocalIP, LD_DiscoveryBroadcastIP
+	global DiscoveryInterfaceChoice, DiscoveryPortTxt, DiscoveryLocalUdpPortTxt
+
+	Gui, networkSettings:Submit, NoHide
+
+	if(!LD_DiscoveryInterfaces.HasKey(DiscoveryInterfaceChoice))
+	{
+		GuiControl, networkSettings:+cRed, NetworkDiscoveryStatus
+		GuiControl, networkSettings:, NetworkDiscoveryStatus, Select a network interface
+		return false
+	}
+	if(DiscoveryPortTxt < 1 || DiscoveryPortTxt > 65535)
+	{
+		GuiControl, networkSettings:+cRed, NetworkDiscoveryStatus
+		GuiControl, networkSettings:, NetworkDiscoveryStatus, Discovery UDP port must be 1-65535
+		return false
+	}
+	if(DiscoveryLocalUdpPortTxt < 0 || DiscoveryLocalUdpPortTxt > 65535)
+	{
+		GuiControl, networkSettings:+cRed, NetworkDiscoveryStatus
+		GuiControl, networkSettings:, NetworkDiscoveryStatus, Local UDP must be 0-65535
+		return false
+	}
+
+	selected := LD_DiscoveryInterfaces[DiscoveryInterfaceChoice]
+	LD_DiscoveryPort := DiscoveryPortTxt
+	LD_DiscoveryLocalUdpPort := DiscoveryLocalUdpPortTxt
+	LD_DiscoveryLocalIP := selected.ip
+	LD_DiscoveryBroadcastIP := LibreDeckDiscoveryCalculateBroadcast(selected.ip, selected.mask)
+	GuiControl, networkSettings:, DiscoveryBroadcastTxt, %LD_DiscoveryBroadcastIP%
+
+	StopLibreDeckDiscoveryClient()
+	if(!StartLibreDeckDiscoveryClient())
+	{
+		GuiControl, networkSettings:+cRed, NetworkDiscoveryStatus
+		GuiControl, networkSettings:, NetworkDiscoveryStatus, Could not start discovery socket
+		return false
+	}
+
+	GuiControl, networkSettings:+cBlack, NetworkDiscoveryStatus
+	return true
+}
+
+StartLibreDeckDiscoveryClient()
+{
+	global LD_DiscoverySock, LD_DiscoverySocketCallback, LD_DiscoveryWinsockStarted
+	global LD_DiscoveryLocalUdpPort, LD_DiscoveryLocalIP, LD_DISCOVERY_SOCKET_MSG, LD_DISCOVERY_FD_READ
+
+	if(!LD_DiscoveryWinsockStarted)
+	{
+		if(!LD_StartWinsock())
+			return false
+		LD_DiscoveryWinsockStarted := true
+	}
+
+	LD_DiscoverySock := LD_CreateUdpSocket()
+	if(LD_DiscoverySock = -1)
+		return false
+
+	if(!LD_Bind(LD_DiscoverySock, LD_DiscoveryLocalUdpPort, LD_DiscoveryLocalIP))
+	{
+		LD_CloseSocket(LD_DiscoverySock)
+		LD_DiscoverySock := -1
+		return false
+	}
+
+	if(!LD_SetBroadcast(LD_DiscoverySock, true))
+	{
+		LD_CloseSocket(LD_DiscoverySock)
+		LD_DiscoverySock := -1
+		return false
+	}
+
+	if(LD_DiscoverySocketCallback = "")
+		LD_DiscoverySocketCallback := Func("LibreDeckDiscoverySocketMessage")
+	OnMessage(LD_DISCOVERY_SOCKET_MSG, LD_DiscoverySocketCallback)
+
+	if(!LD_RegisterAsync(LD_DiscoverySock, LD_DISCOVERY_SOCKET_MSG, LD_DISCOVERY_FD_READ))
+	{
+		OnMessage(LD_DISCOVERY_SOCKET_MSG, LD_DiscoverySocketCallback, 0)
+		LD_CloseSocket(LD_DiscoverySock)
+		LD_DiscoverySock := -1
+		return false
+	}
+
+	return true
+}
+
+StopLibreDeckDiscoveryClient()
+{
+	global LD_DiscoverySock, LD_DiscoverySocketCallback, LD_DiscoveryDiscovering, LD_DISCOVERY_SOCKET_MSG
+
+	SetTimer, NetworkDiscoveryFinish, Off
+	LD_DiscoveryDiscovering := false
+	if(LD_DiscoverySock = -1)
+		return
+
+	if(LD_DiscoverySocketCallback != "")
+		OnMessage(LD_DISCOVERY_SOCKET_MSG, LD_DiscoverySocketCallback, 0)
+	LD_UnregisterAsync(LD_DiscoverySock, LD_DISCOVERY_SOCKET_MSG)
+	LD_CloseSocket(LD_DiscoverySock)
+	LD_DiscoverySock := -1
+}
+
+LibreDeckDiscoveryShutdown()
+{
+	global LD_DiscoveryWinsockStarted
+
+	StopLibreDeckDiscoveryClient()
+	if(LD_DiscoveryWinsockStarted)
+	{
+		DllCall("Ws2_32\WSACleanup")
+		LD_DiscoveryWinsockStarted := false
+	}
+}
+
+LibreDeckDiscoverySocketMessage(wParam, lParam, msg, hwnd)
+{
+	global LD_DiscoverySock, LD_DiscoveryDiscovering, LD_DISCOVERY_FD_READ
+
+	if(wParam != LD_DiscoverySock)
+		return
+	if(LD_AsyncError(lParam))
+		return
+	if(LD_AsyncEvent(lParam) != LD_DISCOVERY_FD_READ)
+		return
+
+	received := LD_RecvOne(LD_DiscoverySock, message, ip, port, fromAddr)
+	if(received = -1)
+		return
+
+	if(InStr(message, "LIBREDECK_SERVER|") = 1)
+		LibreDeckDiscoveryAddOrUpdateServer(ip, message)
+}
+
+LibreDeckDiscoveryAddOrUpdateServer(ip, message)
+{
+	global LD_DiscoveryServers
+
+	if(!WinExist("LibreDeck Network Settings"))
+		return
+
+	name := LD_GetField(message, "name")
+	tcpPort := LD_GetField(message, "tcp_port")
+	resourcePort := LD_GetField(message, "resource_port")
+	version := LD_GetField(message, "version")
+
+	if(name = "")
+		name := "(unnamed)"
+	if(tcpPort = "")
+		tcpPort := "?"
+	if(resourcePort = "")
+		resourcePort := "?"
+	if(version = "")
+		version := "?"
+
+	FormatTime, now,, HH:mm:ss
+	key := ip ":" tcpPort ":" resourcePort
+	Gui, networkSettings:Default
+	if(LD_DiscoveryServers.HasKey(key))
+	{
+		row := LD_DiscoveryServers[key]
+		LV_Modify(row, "", name, ip, tcpPort, resourcePort, version, now)
+	}
+	else
+	{
+		row := LV_Add("", name, ip, tcpPort, resourcePort, version, now)
+		LD_DiscoveryServers[key] := row
+	}
+
+	count := LV_GetCount()
+	GuiControl, networkSettings:+cBlack, NetworkDiscoveryStatus
+	GuiControl, networkSettings:, NetworkDiscoveryStatus, Receiving... %count% server(s)
+}
+
+NetworkDiscoveryFillConnectionForm(row)
+{
+	global
+
+	Gui, networkSettings:Default
+	LV_GetText(selectedIP, row, 2)
+	LV_GetText(selectedPort, row, 3)
+	LV_GetText(selectedResourcePort, row, 4)
+
+	if(selectedIP = "" || selectedPort = "" || selectedPort = "?")
+		return false
+
+	GuiControl, networkSettings:, OnlineChk, 1
+	GuiControl, networkSettings:, IpTxt, %selectedIP%
+	GuiControl, networkSettings:, PortTxt, %selectedPort%
+	if(selectedResourcePort != "" && selectedResourcePort != "?")
+		GuiControl, networkSettings:, ResourcesPortTxt, %selectedResourcePort%
+	return true
+}
+
+LibreDeckDiscoveryBuildInterfaceList()
+{
+	global LD_DiscoveryInterfaces
+
+	LD_DiscoveryInterfaces := {}
+	list := ""
+
+	try wmi := ComObjGet("winmgmts:\\.\root\cimv2")
+	catch
+		return ""
+
+	query := "SELECT Description, IPAddress, IPSubnet FROM Win32_NetworkAdapterConfiguration WHERE IPEnabled = True"
+	for adapter in wmi.ExecQuery(query)
+	{
+		ips := adapter.IPAddress
+		masks := adapter.IPSubnet
+		if(!IsObject(ips) || !IsObject(masks))
+			continue
+
+		maxIndex := ips.MaxIndex()
+		if(maxIndex = "")
+			continue
+
+		Loop, % maxIndex + 1
+		{
+			i := A_Index - 1
+			ip := ips[i]
+			mask := masks[i]
+			if(!LibreDeckDiscoveryIsIPv4(ip) || !LibreDeckDiscoveryIsIPv4(mask))
+				continue
+			if(SubStr(ip, 1, 4) = "127.")
+				continue
+
+			description := adapter.Description
+			label := ip " / " mask " - " description
+			entry := {}
+			entry.ip := ip
+			entry.mask := mask
+			entry.description := description
+			LD_DiscoveryInterfaces[label] := entry
+
+			if(list = "")
+				list := label "||"
+			else
+				list .= label "|"
+		}
+	}
+
+	if(list = "")
+		return "|"
+	return RTrim(list, "|")
+}
+
+LibreDeckDiscoveryIsIPv4(ip)
+{
+	parts := StrSplit(ip, ".")
+	if(parts.MaxIndex() != 4)
+		return false
+
+	for index, part in parts
+	{
+		if part is not integer
+			return false
+		if(part < 0 || part > 255)
+			return false
+	}
+	return true
+}
+
+LibreDeckDiscoveryCalculateBroadcast(ip, mask)
+{
+	ipParts := StrSplit(ip, ".")
+	maskParts := StrSplit(mask, ".")
+
+	b1 := (ipParts[1] | (255 ^ maskParts[1])) & 255
+	b2 := (ipParts[2] | (255 ^ maskParts[2])) & 255
+	b3 := (ipParts[3] | (255 ^ maskParts[3])) & 255
+	b4 := (ipParts[4] | (255 ^ maskParts[4])) & 255
+
+	return b1 "." b2 "." b3 "." b4
+}
 
 setWifiIcon:
 	Gui, 1:Default

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -20,9 +21,21 @@ type Request struct {
 	FicheroEjecutar string `json:"FicheroEjecutar"`
 }
 
+type ServerConfig struct {
+	Port              int `json:"port"`
+	ResourceSharePort int `json:"resourceSharePort"`
+}
+
 func main() {
+	cfg := loadServerConfig("./conf/server_config.json")
+	tcpPort := getenv("TCP_PORT", strconv.Itoa(cfg.Port))
+
 	// Servicio local
-	addr := getenv("TCP_ADDR", "127.0.0.1:7778")
+	addr := getenv("TCP_ADDR", "0.0.0.0:"+tcpPort)
+	advertisedTCPPort := tcpPortFromAddr(addr, tcpPort)
+	resourcePort := getenv("RESOURCE_PORT", strconv.Itoa(cfg.ResourceSharePort))
+	discoveryPort := getenv("DISCOVERY_PORT", "37921")
+	serverName := getenv("SERVER_NAME", defaultServerName())
 
 	// Carpeta donde están los .ahk (botones)
 	buttonsDir := getenv("BUTTONS_DIR", "./buttons")
@@ -45,6 +58,11 @@ func main() {
 	log.Printf("Servidor TCP escuchando en %s", addr)
 	log.Printf("Botones: %s", absButtons)
 	log.Printf("AutoHotkey: %s", ahkExe)
+	if err := startDiscoveryServer(discoveryPort, serverName, advertisedTCPPort, resourcePort); err != nil {
+		log.Printf("Discovery UDP desactivado: %v", err)
+	} else {
+		log.Printf("Discovery UDP escuchando en 0.0.0.0:%s como %q", discoveryPort, serverName)
+	}
 
 	for {
 		conn, err := ln.Accept()
@@ -54,6 +72,38 @@ func main() {
 		}
 		go handleConn(conn, absButtons, ahkExe)
 	}
+}
+
+func startDiscoveryServer(discoveryPort, serverName, tcpPort, resourcePort string) error {
+	addr, err := net.ResolveUDPAddr("udp4", ":"+discoveryPort)
+	if err != nil {
+		return err
+	}
+	conn, err := net.ListenUDP("udp4", addr)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		buf := make([]byte, 2048)
+		for {
+			n, remote, err := conn.ReadFromUDP(buf)
+			if err != nil {
+				log.Printf("discovery read error: %v", err)
+				continue
+			}
+			message := string(buf[:n])
+			if !strings.HasPrefix(message, "LIBREDECK_DISCOVER") {
+				continue
+			}
+
+			response := fmt.Sprintf("LIBREDECK_SERVER|version=1|name=%s|tcp_port=%s|resource_port=%s", serverName, tcpPort, resourcePort)
+			if _, err := conn.WriteToUDP([]byte(response), remote); err != nil {
+				log.Printf("discovery write error: %v", err)
+			}
+		}
+	}()
+	return nil
 }
 
 func handleConn(conn net.Conn, buttonsDir, ahkExe string) {
@@ -228,4 +278,36 @@ func getenv(k, def string) string {
 		return def
 	}
 	return v
+}
+
+func loadServerConfig(path string) ServerConfig {
+	cfg := ServerConfig{Port: 7778, ResourceSharePort: 7779}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return cfg
+	}
+	_ = json.Unmarshal(data, &cfg)
+	if cfg.Port == 0 {
+		cfg.Port = 7778
+	}
+	if cfg.ResourceSharePort == 0 {
+		cfg.ResourceSharePort = 7779
+	}
+	return cfg
+}
+
+func tcpPortFromAddr(addr, fallback string) string {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil || port == "" {
+		return fallback
+	}
+	return port
+}
+
+func defaultServerName() string {
+	name, err := os.Hostname()
+	if err != nil || strings.TrimSpace(name) == "" {
+		return "LibreDeck Server"
+	}
+	return name
 }
