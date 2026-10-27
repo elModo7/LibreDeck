@@ -1,8 +1,8 @@
 ﻿; OS Version ...: > Windows 10
-; Requires AutoHotkeyU32
+; Recommended AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 4.1.0
+;@Ahk2Exe-SetVersion 4.4.1
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -10,13 +10,13 @@
 /*
 TODO:
 - Reactive window configurer GUI (Program Selector, Page Selector)
-- Más funciones de OBS
-- BtnDescriptions (label con texto de descripción (texto, color, transparencia, fontweight))
+- More OBS functions
+- BtnDescriptions (label with description (text, color, transparency, fontweight))
 
 REQUIERES:
 - Windows 10
-- AutoHotkey U32 (las librerías JSON y them.dll no funcionan en U64)
-- Compilar sin MPRESS, se pierde compatibilidad con USkin.dll
+- AutoHotkey (JSON lib (deprecated one, cJSON does) and them.dll do not work under U64 AHK, use U32 for uskin support)
+- Compile without MPRESS, USkin.dll compatibility is lost otherwise
 - Notification System ONLY works when compiled
 
 DISCARDED:
@@ -32,6 +32,9 @@ LATEST CHANGES:
 - Add spotify integration (3.8.2+) -> https://github.com/CloakerSmoker/Spotify.ahk
 - Add proper button folders
 - Add dynamic discovery (4.1.0+)
+- Add network profiling (4.2.0+)
+- Add i18n translations (4.3.0+)
+- Remove deprecated JSON Lib (4.4.1+)
 
 COMMENTS:
 - This script is one of my very first AutoHotkey scripts (Jun 2017), it can be improved A LOT, code quality wise (starting from keeping it consistent with a single language instead of Spanglish). However, I use it on a day to day basis and it is "robust enough" and convenient that I make heavy use of it, even above any other Hotkey, Dedicated Keyboard, Macro Deck, StreamDock or Android solutions I currently have purchased.
@@ -45,7 +48,10 @@ SetWorkingDir %A_ScriptDir%
 DetectHiddenWindows, On
 CoordMode,Mouse,Screen
 SetBatchLines, -1
-#Include, <JSON>
+FileEncoding, UTF-8
+;~ #Include <JSON> ; Deprecated in 4.4.1
+#Include <cJSON>
+#Include <i18n>
 #Include <SplashScreen>
 #Include <Socket>
 #Include <LibreDeckDiscovery>
@@ -56,7 +62,7 @@ SetBatchLines, -1
 #Include <plugin_system>
 #Include <LibreDeckButtonImage>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "4.1.0"
+global ClientVersionNumber := "4.4.1"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -65,10 +71,16 @@ global CarpetaBoton, PaginaCarpeta, BotonActivo, BotonAPulsar, windowHandler, Ip
 global RutaBoton1, RutaBoton2, RutaBoton3, RutaBoton4, RutaBoton5, RutaBoton6, RutaBoton7, RutaBoton8, RutaBoton9, RutaBoton10, RutaBoton11, RutaBoton12, RutaBoton13, RutaBoton14, RutaBoton15
 global feedbackEjecucion := []
 global plugins := []
+global LD_i18n := ""
+global LD_ButtonClipboard := ""
+global LD_ButtonMoveSource := ""
+global LD_ButtonSelection := []
+global LD_ButtonSelectionMap := {}
 global LD_ScriptGeneratorMenuHandlers := {}
 global LD_ScriptGeneratorMenus := {}
 global LD_DiscoveryServers := {}
 global LD_DiscoveryInterfaces := {}
+global LD_DiscoverySocks := []
 global LD_DiscoverySock := -1
 global LD_DiscoverySocketCallback := ""
 global LD_DiscoveryWinsockStarted := false
@@ -81,6 +93,11 @@ global LD_DISCOVERY_SOCKET_MSG := 0x9989
 global LD_DISCOVERY_FD_READ := 1
 global LD_DISCOVERY_TIMEOUT_MS := 1200
 global LD_NetworkConfigSkipReload := false
+global LD_CurrentDiscoveredServerName := ""
+global LD_TCP_CONNECT_TIMEOUT_MS := 2000
+global LD_TCP_CONNECT_ATTEMPTS := 2
+global LD_ReconnectAttemptCount := 0
+global LD_ButtonEditorActiveId := ""
 global NumeroPagina := 0
 global serverFound := 0
 global reactiveWindow := 0
@@ -89,6 +106,7 @@ SkinForm(Apply, A_ScriptDir . "\lib\script_generator\lib\them.dll", A_ScriptDir 
 OnExit, GetOut
 FileCreateDir, conf
 FileCreateDir, buttons
+FileCreateDir, i18n
 global btnPics := {}
 GuiControl, splashScreen:, splashTxt, % "Reading config..."
 contextcolor(2) ;0=Default ;1=AllowDark ;2=ForceDark ;3=ForceLight ;4=Max
@@ -114,6 +132,9 @@ if(!FileExist("./conf/config.json"))
 	conf.ip := "127.0.0.1"
 	conf.port := "7778"
 	conf.resourcesPort := "7779"
+	conf.serverProfiles := {}
+	conf.favoriteServerProfile := ""
+	conf.lastServerProfile := ""
 	conf.extension := "ahk"
 	conf.folderButtons := {"5":"OBS"}
 	conf.folderButtons.1 := "UtilesStream"
@@ -137,10 +158,13 @@ if(!FileExist("./conf/config.json"))
 	conf.reactiveWindow := 0
 	conf.lookForUpdates := 1
 	conf.isGolangServer := 0
+	conf.language := "en_US"
 	gosub, guardarConfig
 }
 
 gosub, loadConfig
+LD_InitI18n()
+LibreDeckApplyStartupProfile()
 GuiControl, splashScreen:, splashTxt, % "Creating Tray & Context Menus..."
 
 ; dark mode menu options
@@ -156,145 +180,157 @@ contextcolor(color:=2) ; change the number here from the list above if you want 
 ; *******************************
 Menu, tray, NoStandard
 Menu, tray, tip, LibreDeck Client v%ClientVersionNumber%
-Menu, tray, add, Run LibreDeck server, runServer
-Menu tray, Icon, Run LibreDeck server, .\resources\img\ico\libredeck.ico
-Menu, tray, add, Hide, ToggleHide
-Menu tray, Icon, Hide, .\resources\img\ico\windows\cut_visibility.ico
-Menu, tray, add, Set Editor Path, CambiarRutaEditor
-Menu tray, Icon, Set Editor Path, .\resources\img\ico\windows\edit2.ico
-Menu tray, add, Set Start Window Possition, setStartPossition
-Menu tray, Icon, Set Start Window Possition, .\resources\img\ico\windows\window_possition.ico
-Menu tray, add, Backup LibreDeck Folder (*.7z), generateBackup
-Menu tray, Icon, Backup LibreDeck Folder (*.7z), .\resources\img\ico\windows\compressed_folder.ico
-Menu tray, add, Open LibreDeck Folder, openLibreDeckFolder
-Menu tray, Icon, Open LibreDeck Folder, .\resources\img\ico\windows\folder.ico
+Menu, tray, add, % LD_T("tray.run_server", "Run LibreDeck server"), runServer
+Menu tray, Icon, % LD_T("tray.run_server", "Run LibreDeck server"), .\resources\img\ico\libredeck.ico
+Menu, tray, add, % LD_T("tray.hide", "Hide"), ToggleHide
+Menu tray, Icon, % LD_T("tray.hide", "Hide"), .\resources\img\ico\windows\cut_visibility.ico
+Menu, tray, add, % LD_T("tray.set_editor_path", "Set Editor Path"), CambiarRutaEditor
+Menu tray, Icon, % LD_T("tray.set_editor_path", "Set Editor Path"), .\resources\img\ico\windows\edit2.ico
+Menu tray, add, % LD_T("tray.set_start_position", "Set Start Window Possition"), setStartPossition
+Menu tray, Icon, % LD_T("tray.set_start_position", "Set Start Window Possition"), .\resources\img\ico\windows\window_possition.ico
+Menu tray, add, % LD_T("tray.backup_folder", "Backup LibreDeck Folder (*.7z)"), generateBackup
+Menu tray, Icon, % LD_T("tray.backup_folder", "Backup LibreDeck Folder (*.7z)"), .\resources\img\ico\windows\compressed_folder.ico
+Menu tray, add, % LD_T("tray.open_folder", "Open LibreDeck Folder"), openLibreDeckFolder
+Menu tray, Icon, % LD_T("tray.open_folder", "Open LibreDeck Folder"), .\resources\img\ico\windows\folder.ico
 Menu, tray, add
-Menu, tray, add, Network Settings, crearGuiNetworkSettings
-Menu tray, Icon, Network Settings, .\resources\img\ico\windows\network2.ico
+LD_BuildLanguageMenu()
+Menu tray, Add, % LD_T("tray.language", "Language"), :LanguageMenu
+Menu tray, Icon, % LD_T("tray.language", "Language"), .\resources\img\ico\windows\internet_time.ico
 Menu, tray, add
-Menu LookForUpdatesMenu, Add, On Boot, lookForUpdatesOnBootLabel
-Menu LookForUpdatesMenu, Icon, On Boot, .\resources\img\ico\windows\look_for_updates.ico
-Menu LookForUpdatesMenu, Add, Now, lookForUpdatesLabel
-Menu LookForUpdatesMenu, Icon, Now, .\resources\img\ico\windows\download.ico
-Menu tray, Add, Look for Updates, :LookForUpdatesMenu
-Menu tray, Icon, Look for Updates, .\resources\img\ico\windows\refresh.ico
+Menu, tray, add, % LD_T("tray.network_settings", "Network Settings"), crearGuiNetworkSettings
+Menu tray, Icon, % LD_T("tray.network_settings", "Network Settings"), .\resources\img\ico\windows\network2.ico
+Menu, tray, add
+Menu LookForUpdatesMenu, Add, % LD_T("tray.updates_on_boot", "On Boot"), lookForUpdatesOnBootLabel
+Menu LookForUpdatesMenu, Icon, % LD_T("tray.updates_on_boot", "On Boot"), .\resources\img\ico\windows\look_for_updates.ico
+Menu LookForUpdatesMenu, Add, % LD_T("tray.updates_now", "Now"), lookForUpdatesLabel
+Menu LookForUpdatesMenu, Icon, % LD_T("tray.updates_now", "Now"), .\resources\img\ico\windows\download.ico
+Menu tray, Add, % LD_T("tray.look_for_updates", "Look for Updates"), :LookForUpdatesMenu
+Menu tray, Icon, % LD_T("tray.look_for_updates", "Look for Updates"), .\resources\img\ico\windows\refresh.ico
 
 Menu, tray, add, % "v" ClientVersion, showAboutScreen
 Menu tray, Icon, % "v" ClientVersion, .\resources\img\ico\windows\info.ico
 ;~ Menu, tray, disable, % "v" ClientVersion
-Menu, tray, add, Exit, Exit
-Menu tray, Icon, Exit, .\resources\img\ico\windows\close3.ico
+Menu, tray, add, % LD_T("tray.exit", "Exit"), Exit
+Menu tray, Icon, % LD_T("tray.exit", "Exit"), .\resources\img\ico\windows\close3.ico
 
 if(conf.lookForUpdates)
-	Menu LookForUpdatesMenu, Check, On Boot
+	Menu LookForUpdatesMenu, Check, % LD_T("tray.updates_on_boot", "On Boot")
 else
-	Menu LookForUpdatesMenu, UnCheck, On Boot
+	Menu LookForUpdatesMenu, UnCheck, % LD_T("tray.updates_on_boot", "On Boot")
 
 ; CONTEXT MENU GENERICO
 ; *******************************
-Menu ContextMenuGenerico, Add, Always on Top, SiempreVisible
+Menu ContextMenuGenerico, Add, % LD_T("app_menu.always_on_top", "Always on Top"), SiempreVisible
 if(conf.siempreVisible)
 {
-	Menu ContextMenuGenerico, Check, Always on Top
+	Menu ContextMenuGenerico, Check, % LD_T("app_menu.always_on_top", "Always on Top")
 }
 else
 {
-	Menu ContextMenuGenerico, UnCheck, Always on Top
+	Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.always_on_top", "Always on Top")
 }
 
-Menu ContextMenuGenerico, Add, Center Mouse after Activation, MoverRatonAlPulsarBotonToggle
+Menu ContextMenuGenerico, Add, % LD_T("app_menu.center_mouse", "Center Mouse after Activation"), MoverRatonAlPulsarBotonToggle
 if(conf.moverRatonAlPulsarBoton)
 {
-	Menu ContextMenuGenerico, Check, Center Mouse after Activation
+	Menu ContextMenuGenerico, Check, % LD_T("app_menu.center_mouse", "Center Mouse after Activation")
 }
 else
 {
-	Menu ContextMenuGenerico, UnCheck, Center Mouse after Activation
+	Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.center_mouse", "Center Mouse after Activation")
 }
-Menu ContextMenuGenerico, Add, Send Alt+Tab after Activation, enviarAltTabAlPulsarBotonToggle
+Menu ContextMenuGenerico, Add, % LD_T("app_menu.send_alt_tab", "Send Alt+Tab after Activation"), enviarAltTabAlPulsarBotonToggle
 if(conf.enviarAltTabAlPulsarBoton)
 {
-	Menu ContextMenuGenerico, Check, Send Alt+Tab after Activation
+	Menu ContextMenuGenerico, Check, % LD_T("app_menu.send_alt_tab", "Send Alt+Tab after Activation")
 }
 else
 {
-	Menu ContextMenuGenerico, UnCheck, Send Alt+Tab after Activation
+	Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.send_alt_tab", "Send Alt+Tab after Activation")
 }
-Menu ContextMenuGenerico, Add, Progressive Icon Loading, cargaProgresivaIconosToggle
+Menu ContextMenuGenerico, Add, % LD_T("app_menu.progressive_icon_loading", "Progressive Icon Loading"), cargaProgresivaIconosToggle
 if(conf.cargaProgresivaIconos)
 {
-	Menu ContextMenuGenerico, Check, Progressive Icon Loading
+	Menu ContextMenuGenerico, Check, % LD_T("app_menu.progressive_icon_loading", "Progressive Icon Loading")
 }
 else
 {
-	Menu ContextMenuGenerico, UnCheck, Progressive Icon Loading
+	Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.progressive_icon_loading", "Progressive Icon Loading")
 }
-Menu ContextMenuGenerico, Add, Mini Client, CambiarDimensionesCliente
-Menu ContextMenuGenerico, UnCheck, Mini Client
-Menu ContextMenuGenerico, Add, Set Start Window Possition, setStartPossition
-Menu ContextMenuGenerico, UnCheck, Set Start Window Possition
-Menu ContextMenuGenerico, Add, Use built-in AHK, toggleBuiltInAhk
+Menu ContextMenuGenerico, Add, % LD_T("app_menu.mini_client", "Mini Client"), CambiarDimensionesCliente
+Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.mini_client", "Mini Client")
+Menu ContextMenuGenerico, Add, % LD_T("tray.set_start_position", "Set Start Window Possition"), setStartPossition
+Menu ContextMenuGenerico, UnCheck, % LD_T("tray.set_start_position", "Set Start Window Possition")
+Menu ContextMenuGenerico, Add, % LD_T("app_menu.use_builtin_ahk", "Use built-in AHK"), toggleBuiltInAhk
 if(conf.builtin_ahk)
 {
-	Menu ContextMenuGenerico, Check, Use built-in AHK
+	Menu ContextMenuGenerico, Check, % LD_T("app_menu.use_builtin_ahk", "Use built-in AHK")
 }
 else
 {
-	Menu ContextMenuGenerico, UnCheck, Use built-in AHK
+	Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.use_builtin_ahk", "Use built-in AHK")
 }
-Menu ContextMenuGenerico, Add, Minimize to tray (Hide), ToggleHide
-Menu ContextMenuGenerico, Add, Reactive Pages, changeReactiveSetting
+Menu ContextMenuGenerico, Add, % LD_T("app_menu.minimize_to_tray", "Minimize to tray (Hide)"), ToggleHide
+Menu ContextMenuGenerico, Add, % LD_T("app_menu.reactive_pages", "Reactive Pages"), changeReactiveSetting
 if(conf.reactiveWindow)
 {
-	Menu ContextMenuGenerico, Check, Reactive Pages
+	Menu ContextMenuGenerico, Check, % LD_T("app_menu.reactive_pages", "Reactive Pages")
 }
 else
 {
-	Menu ContextMenuGenerico, UnCheck, Reactive Pages
+	Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.reactive_pages", "Reactive Pages")
 }
-Menu ContextMenuGenerico, Add, Bind this folder to a program or window, bindFolderToProgramOrWindow
-Menu ContextMenuGenerico, Disable, Bind this folder to a program or window
+Menu ContextMenuGenerico, Add, % LD_T("app_menu.bind_folder", "Bind this folder to a program or window"), bindFolderToProgramOrWindow
+Menu ContextMenuGenerico, Disable, % LD_T("app_menu.bind_folder", "Bind this folder to a program or window")
 
 ; Plugin System
 GuiControl, splashScreen:, splashTxt, % "Loading Plugins..."
 Loop, Files, plugins/*.json
 {
 	FileRead, pluginJson, % A_LoopFileFullPath
-	plugin := ParseJson(pluginJson)
+	plugin := JSON.Load(pluginJson)
 	plugins.push(plugin)
 }
 SortPluginsByPriority(plugins)
 gosub, reloadPlugins
 GuiControl, splashScreen:, splashTxt, % "Loaded Plugins!"
 
-Menu ContextMenu, Add, Edit Script`tShift + Click, GuiEditarScript
-Menu ContextMenu, Default, Edit Script`tShift + Click
-Menu ContextMenu, Icon, Edit Script`tShift + Click, .\resources\img\ico\windows\edit2.ico
-Menu ContextMenu, Add, Script Generator`tAlt + Right Click, :scriptGenerator
-Menu ContextMenu, Icon, Script Generator`tAlt + Right Click, shell32.dll, 85
-Menu ContextMenu, Add, Change/Del Image`tCtrl + Shift + Click, GuiCambiarImagenBoton
-Menu ContextMenu, Icon, Change/Del Image`tCtrl + Shift + Click, shell32.dll, 142
-Menu ContextMenu, Add, Generate Default Image, GuiGenerarImagenBoton
-Menu ContextMenu, Icon, Generate Default Image, shell32.dll, 135
-Menu ContextMenu, Add, Button Name`tCtrl + Click, GuiInfoBoton
-Menu ContextMenu, Icon, Button Name`tCtrl + Click, shell32.dll, 24
-Menu ContextMenu, Add, Create Folder Button, CreateFolderButton
-Menu ContextMenu, Icon, Create Folder Button, .\resources\img\ico\windows\folder.ico
-Menu ContextMenu, Add, Delete Folder Button, DeleteFolderButton
-Menu ContextMenu, Icon, Delete Folder Button, shell32.dll, 235
-Menu ContextMenu, Add, Delete Button Function, DeleteButtonFunction
-Menu ContextMenu, Icon, Delete Button Function, shell32.dll, 132
+Menu ContextMenu, Add, % LD_T("button_menu.button_editor", "Button Editor"), GuiButtonEditor
+Menu ContextMenu, Default, % LD_T("button_menu.button_editor", "Button Editor")
+Menu ContextMenu, Icon, % LD_T("button_menu.button_editor", "Button Editor"), shell32.dll, 269
+Menu ContextMenu, Add, % LD_T("button_menu.edit_script", "Edit Script`tShift + Click"), GuiEditarScript
+Menu ContextMenu, Icon, % LD_T("button_menu.edit_script", "Edit Script`tShift + Click"), .\resources\img\ico\windows\edit2.ico
+Menu ContextMenu, Add, % LD_T("button_menu.script_generator", "Script Generator`tAlt + Right Click"), :scriptGenerator
+Menu ContextMenu, Icon, % LD_T("button_menu.script_generator", "Script Generator`tAlt + Right Click"), shell32.dll, 85
+Menu ContextMenu, Add, % LD_T("button_menu.change_image", "Change/Del Image`tCtrl + Shift + Click"), GuiCambiarImagenBoton
+Menu ContextMenu, Icon, % LD_T("button_menu.change_image", "Change/Del Image`tCtrl + Shift + Click"), shell32.dll, 142
+Menu ContextMenu, Add, % LD_T("button_menu.generate_image", "Generate Default Image"), GuiGenerarImagenBoton
+Menu ContextMenu, Icon, % LD_T("button_menu.generate_image", "Generate Default Image"), shell32.dll, 135
+Menu ContextMenu, Add, % LD_T("button_menu.button_name", "Button Name`tCtrl + Click"), GuiInfoBoton
+Menu ContextMenu, Icon, % LD_T("button_menu.button_name", "Button Name`tCtrl + Click"), shell32.dll, 24
+Menu ContextMenu, Add
+Menu ContextMenu, Add, % LD_T("button_menu.copy_button", "Copy Button"), GuiCopyButton
+Menu ContextMenu, Icon, % LD_T("button_menu.copy_button", "Copy Button"), shell32.dll, 134
+Menu ContextMenu, Add, % LD_T("button_menu.paste_button", "Paste Button"), GuiPasteButton
+Menu ContextMenu, Icon, % LD_T("button_menu.paste_button", "Paste Button"), shell32.dll, 146
+Menu ContextMenu, Add, % LD_T("button_menu.move_button", "Move Button"), GuiMoveButton
+Menu ContextMenu, Icon, % LD_T("button_menu.move_button", "Move Button"), shell32.dll, 147
+Menu ContextMenu, Add
+Menu ContextMenu, Add, % LD_T("button_menu.create_folder", "Create Folder Button"), CreateFolderButton
+Menu ContextMenu, Icon, % LD_T("button_menu.create_folder", "Create Folder Button"), .\resources\img\ico\windows\folder.ico
+Menu ContextMenu, Add, % LD_T("button_menu.delete_folder", "Delete Folder Button"), DeleteFolderButton
+Menu ContextMenu, Icon, % LD_T("button_menu.delete_folder", "Delete Folder Button"), shell32.dll, 235
+Menu ContextMenu, Add, % LD_T("button_menu.delete_function", "Delete Button Function"), DeleteButtonFunction
+Menu ContextMenu, Icon, % LD_T("button_menu.delete_function", "Delete Button Function"), shell32.dll, 132
 
 ; CONNECTION TO SERVER (ONLINE == 1)
 if(conf.online)
 {
 	GuiControl, splashScreen:, splashTxt, % conf.ip ":" conf.port " - Connecting to server..."
 	sleep, 1 ; Needed to apply previous GuiControl
-	global tcpCon := new SocketTCP()
-	tcpCon.connect(conf.ip, conf.port)
-	tcpCon.onRecv := Func("OnTcpRecv")
-	if(tcpCon.errorNM != "")
+	if(!LibreDeckConnectWithRetry(conf.ip, conf.port, LD_TCP_CONNECT_ATTEMPTS))
 	{
+		LibreDeckSwitchToOfflineMode(LD_T("network.status_offline_after_failed_reconnect", "Connection failed twice. Offline mode enabled."), false)
 		gosub, precargaIconosLocalesEnRam
 		GuiControl, , wifi_icon, % btnPics["wifi_icon_offline.png"] ? "HBITMAP:*" btnPics["wifi_icon_offline.png"] : ""
 		serverFound := 0 ; Online Mode but couldn't connect, so we keep Offline Functionality
@@ -304,11 +340,13 @@ if(conf.online)
 	else
 	{
 		serverFound := 1
+		LD_ReconnectAttemptCount := 0
+		SetTimer, LibreDeckConnectionWatchdog, 5000
 		GuiControl, splashScreen:, splashTxt, % "Connected! Downloading Profile..."
 		gosub, downloadServerProfile
 		GuiControl, , wifi_icon, % btnPics["wifi_icon_online.png"] ? "HBITMAP:*" btnPics["wifi_icon_online.png"] : ""
 		FileRead, server_config, % "./resources/img/" conf.ip "/resourcePack_info.txt"
-		server_config := ParseJson(server_config)
+		server_config := JSON.Load(server_config)
 		conf.folderButtons := server_config.folderButtons
 	}
 }
@@ -391,23 +429,33 @@ ToggleHide:
 if EsVisible
 {
 	WinHide, LibreDeck Client
-	Menu, tray, Rename, Hide, Show
+	Menu, tray, Rename, % LD_T("tray.hide", "Hide"), % LD_T("tray.show", "Show")
 	EsVisible = 0
 }
 else
 {
 	WinShow, LibreDeck Client
 	WinActivate, LibreDeck Client
-	Menu, tray, Rename, Show, Hide
+	Menu, tray, Rename, % LD_T("tray.show", "Show"), % LD_T("tray.hide", "Hide")
 	EsVisible = 1
 }
 Return
+
+ChangeLanguageFromTray:
+	conf.language := A_ThisMenuItem
+	gosub, guardarConfigCambioOnline
+	reload
+return
 
 GuiContextMenu:
 	if GetKeyState("Alt")
 		scriptGen := 1
 	else
 		scriptGen := 0
+	if GetKeyState("Control")
+		advancedMenu := 1
+	else
+		advancedMenu := 0
 	if A_GuiControl In Boton1,Boton2,Boton3,Boton4,Boton5,Boton6,Boton7,Boton8,Boton9,Boton10,Boton11,Boton12,Boton13,Boton14,Boton15
 	{
 		StringReplace, BotonAPulsar, A_GuiControl, boton,
@@ -423,10 +471,13 @@ GuiContextMenu:
 			KeyWait, Alt,
 			Menu scriptGenerator, Show
 		}
-		else
+		else if(advancedMenu)
 		{
+			KeyWait, Control
 			Menu ContextMenu, Show
 		}
+		else
+			ShowButtonEditor(BotonActivo)
 	}
 	else if(A_GuiControl == "settings_icon")
 	{
@@ -449,8 +500,24 @@ GuiGenerarImagenBoton:
 	GenerarImagenBotonDefault(BotonActivo)
 return
 
+GuiButtonEditor:
+	ShowButtonEditor(BotonActivo)
+return
+
 GuiInfoBoton:
 	MsgBox,,Button ID, Clicked button Id is: %BotonActivo%
+return
+
+GuiCopyButton:
+	LD_CopyButton(BotonActivo)
+return
+
+GuiPasteButton:
+	LD_PasteButton(BotonActivo)
+return
+
+GuiMoveButton:
+	LD_MoveButton(BotonActivo)
 return
 
 NotImplemented:
@@ -492,13 +559,13 @@ SiempreVisible:
 	{
 		Winset, AlwaysOnTop, Off, LibreDeck Client
 		conf.siempreVisible := 0
-		Menu ContextMenuGenerico, UnCheck, Always on Top
+		Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.always_on_top", "Always on Top")
 	}
 	else
 	{
 		Winset, AlwaysOnTop, , LibreDeck Client
 		conf.siempreVisible := 1
-		Menu ContextMenuGenerico, Check, Always on Top
+		Menu ContextMenuGenerico, Check, % LD_T("app_menu.always_on_top", "Always on Top")
 	}
 	gosub, guardarConfig
 return
@@ -507,12 +574,12 @@ SetSiempreVisibleInicial:
 	if(!conf.siempreVisible)
 	{
 		Winset, AlwaysOnTop, Off, LibreDeck Client
-		Menu ContextMenuGenerico, UnCheck, Always on Top
+		Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.always_on_top", "Always on Top")
 	}
 	else
 	{
 		Winset, AlwaysOnTop, , LibreDeck Client
-		Menu ContextMenuGenerico, Check, Always on Top
+		Menu ContextMenuGenerico, Check, % LD_T("app_menu.always_on_top", "Always on Top")
 	}
 return
 
@@ -520,12 +587,12 @@ MoverRatonAlPulsarBotonToggle:
 	if(conf.moverRatonAlPulsarBoton)
 	{
 		conf.moverRatonAlPulsarBoton := 0
-		Menu ContextMenuGenerico, UnCheck, Center Mouse after Activation
+		Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.center_mouse", "Center Mouse after Activation")
 	}
 	else
 	{
 		conf.moverRatonAlPulsarBoton := 1
-		Menu ContextMenuGenerico, Check, Center Mouse after Activation
+		Menu ContextMenuGenerico, Check, % LD_T("app_menu.center_mouse", "Center Mouse after Activation")
 	}
 	gosub, guardarConfig
 return
@@ -534,12 +601,12 @@ enviarAltTabAlPulsarBotonToggle:
 	if(conf.enviarAltTabAlPulsarBoton)
 	{
 		conf.enviarAltTabAlPulsarBoton := 0
-		Menu ContextMenuGenerico, UnCheck, Send Alt+Tab after Activation
+		Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.send_alt_tab", "Send Alt+Tab after Activation")
 	}
 	else
 	{
 		conf.enviarAltTabAlPulsarBoton := 1
-		Menu ContextMenuGenerico, Check, Send Alt+Tab after Activation
+		Menu ContextMenuGenerico, Check, % LD_T("app_menu.send_alt_tab", "Send Alt+Tab after Activation")
 	}
 	gosub, guardarConfig
 return
@@ -548,12 +615,12 @@ cargaProgresivaIconosToggle:
 	if(conf.cargaProgresivaIconos)
 	{
 		conf.cargaProgresivaIconos := 0
-		Menu ContextMenuGenerico, UnCheck, Progressive Icon Loading
+		Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.progressive_icon_loading", "Progressive Icon Loading")
 	}
 	else
 	{
 		conf.cargaProgresivaIconos := 1
-		Menu ContextMenuGenerico, Check, Progressive Icon Loading
+		Menu ContextMenuGenerico, Check, % LD_T("app_menu.progressive_icon_loading", "Progressive Icon Loading")
 	}
 	gosub, guardarConfig
 return
@@ -562,12 +629,12 @@ toggleBuiltInAhk:
 	if(conf.builtin_ahk)
 	{
 		conf.builtin_ahk := 0
-		Menu ContextMenuGenerico, UnCheck, Use built-in AHK
+		Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.use_builtin_ahk", "Use built-in AHK")
 	}
 	else
 	{
 		conf.builtin_ahk := 1
-		Menu ContextMenuGenerico, Check, Use built-in AHK
+		Menu ContextMenuGenerico, Check, % LD_T("app_menu.use_builtin_ahk", "Use built-in AHK")
 	}
 	gosub, guardarConfig
 return
@@ -577,7 +644,7 @@ if(!conf.cargaProgresivaIconos)
 	DllCall("LockWindowUpdate", "UInt", windowHandler)
 if conf.miniClient
 {
-	Menu, ContextMenuGenerico, Rename, Normal Client, Mini Client
+	Menu, ContextMenuGenerico, Rename, % LD_T("app_menu.normal_client", "Normal Client"), % LD_T("app_menu.mini_client", "Mini Client")
 	conf.miniClient := 0
 	GuiControl, MoveDraw, Activar1, x120 y40 w150 h150
 	GuiControl, MoveDraw, Activar2, x280 y40 w150 h150
@@ -608,7 +675,7 @@ if conf.miniClient
 }
 else
 {
-	Menu, ContextMenuGenerico, Rename, Mini Client, Normal Client
+	Menu, ContextMenuGenerico, Rename, % LD_T("app_menu.mini_client", "Mini Client"), % LD_T("app_menu.normal_client", "Normal Client")
 	conf.miniClient := 1
 	GuiControl, MoveDraw, Activar1, x54 y14 w59 h59
 	GuiControl, MoveDraw, Activar2, x110 y14 w59 h59
@@ -741,7 +808,7 @@ PulsarBoton(BotonAPulsar)
 			IdBoton := CarpetaBoton 15*PaginaCarpeta+BotonAPulsar
 			EstablecerPagina(NumeroPagina)
 			EnCarpeta = 0
-			Menu ContextMenuGenerico, Disable, Bind this folder to a program or window
+			Menu ContextMenuGenerico, Disable, % LD_T("app_menu.bind_folder", "Bind this folder to a program or window")
 			PaginaCarpeta = 0
 			return	
 		}
@@ -832,7 +899,7 @@ EstablecerPaginaCarpeta(CarpetaBoton, PaginaCarpeta)
 {
 	global
 	EnCarpeta = 1
-	Menu ContextMenuGenerico, Enable, Bind this folder to a program or window
+	Menu ContextMenuGenerico, Enable, % LD_T("app_menu.bind_folder", "Bind this folder to a program or window")
 	if(!conf.cargaProgresivaIconos)
 		DllCall("LockWindowUpdate", "UInt", windowHandler)
 	RutaBoton1 := CarpetaBoton 15*PaginaCarpeta+1 ".png"
@@ -910,6 +977,7 @@ RefrescarBotones(esCarpeta = false)
 		GuiControl, MoveDraw, Boton15, x770 y410 w130 h130		
 	}
 	DllCall("LockWindowUpdate", "UInt", 0)
+	LD_RefreshSelectionIndicators()
 }
 
 RefrescarBotonesMini(esCarpeta = false)
@@ -956,6 +1024,7 @@ RefrescarBotonesMini(esCarpeta = false)
 		GuiControl, MoveDraw, Boton15, x283 y131 w49 h49
 	}
 	DllCall("LockWindowUpdate", "UInt", 0)
+	LD_RefreshSelectionIndicators()
 }
 
 LeftPage:
@@ -1036,7 +1105,7 @@ EstablecerImagenBoton(IdBoton)
 	MsgBoxBtn1 = Change Img
 	MsgBoxBtn2 = Remove
 	MsgBoxBtn3 = Cancel
-	MsgBox 0x23, Change - Delete, Change Image or Remove Button?
+	MsgBox 0x23, Change - Delete, Change Image or Remove it?
 	OnMessage(0x44, "")
 
 	IfMsgBox Yes, {
@@ -1072,6 +1141,7 @@ EstablecerImagenBoton(IdBoton)
 		return
 	}	
 	;~ Sleep, 300 ; Lo he quitado porque para qué esperar
+	Gui, 1:Default
 	if(EnCarpeta)
 	{
 		EstablecerPaginaCarpeta(CarpetaBoton, PaginaCarpeta)
@@ -1238,6 +1308,222 @@ ButtonImageStyleGuiEscape:
 	Gui, 1:Default
 return
 
+ShowButtonEditor(IdBoton)
+{
+	global LD_ButtonEditorActiveId, EnCarpeta, CarpetaBoton, PaginaCarpeta, NumeroPagina, conf
+	global ButtonEditorIdTxt, ButtonEditorDisplayTxt, ButtonEditorIsFolderChk, ButtonEditorFolderTxt, ButtonEditorScriptTxt, ButtonEditorPreview, ButtonEditorStatus
+	global ButtonEditorEditScriptBtn, ButtonEditorChangeImageBtn, ButtonEditorGenerateImageBtn, ButtonEditorTestBtn
+	global ButtonEditorCreateFolderBtn, ButtonEditorDeleteFolderBtn, ButtonEditorDeleteFunctionBtn, ButtonEditorScriptGeneratorBtn
+	global ButtonEditorCopyButtonBtn, ButtonEditorPasteButtonBtn, ButtonEditorMoveButtonBtn
+	global ButtonEditorSelectButtonBtn, ButtonEditorDeselectAllBtn, ButtonEditorSelectionTxt
+
+	LD_ButtonEditorActiveId := IdBoton
+	displayId := GetButtonDisplayId(IdBoton)
+	scriptPath := GetButtonScriptRelativePath(IdBoton, conf.extension)
+	folderInfo := GetButtonEditorFolderInfo(IdBoton)
+	isFolderChecked := folderInfo.isFolder ? "Checked" : ""
+
+	Gui, ButtonEditor:Destroy
+	Gui, ButtonEditor:New, +ToolWindow +OwnDialogs, LibreDeck Button Editor
+	Gui, ButtonEditor:Margin, 12, 12
+	Gui, ButtonEditor:Font, s9, Segoe UI
+	Gui, ButtonEditor:Add, Text, x12 y10 w90 h23 +0x200, % LD_T("button_editor.button_id", "Button ID:")
+	Gui, ButtonEditor:Add, Edit, x110 y10 w250 h21 ReadOnly vButtonEditorIdTxt, %IdBoton%
+	Gui, ButtonEditor:Add, Text, x12 y40 w90 h23 +0x200, % LD_T("button_editor.display", "Display:")
+	Gui, ButtonEditor:Add, Edit, x110 y40 w250 h21 ReadOnly vButtonEditorDisplayTxt, %displayId%
+	Gui, ButtonEditor:Add, Text, x12 y70 w90 h23 +0x200, % LD_T("button_editor.folder", "Folder:")
+	Gui, ButtonEditor:Add, Edit, x110 y70 w120 h21 ReadOnly vButtonEditorFolderTxt, % folderInfo.name
+	Gui, ButtonEditor:Add, CheckBox, x240 y70 w120 h23 Disabled %isFolderChecked% vButtonEditorIsFolderChk, % LD_T("button_editor.is_folder_button", "Is folder button")
+	Gui, ButtonEditor:Add, Text, x12 y100 w90 h23 +0x200, % LD_T("button_editor.script", "Script:")
+	Gui, ButtonEditor:Add, Edit, x110 y100 w250 h21 ReadOnly vButtonEditorScriptTxt, %scriptPath%
+	Gui, ButtonEditor:Add, Picture, x390 y10 w128 h128 vButtonEditorPreview, % ButtonEditorPreviewSource(IdBoton)
+
+	Gui, ButtonEditor:Add, Button, x12 y142 w110 h28 vButtonEditorEditScriptBtn gButtonEditorEditScript, % LD_T("button_editor.edit_script", "Edit Script")
+	Gui, ButtonEditor:Add, Button, x130 y142 w110 h28 vButtonEditorChangeImageBtn gButtonEditorChangeImage, % LD_T("button_editor.change_image", "Change Image")
+	Gui, ButtonEditor:Add, Button, x248 y142 w110 h28 vButtonEditorGenerateImageBtn gButtonEditorGenerateImage, % LD_T("button_editor.generate_image", "Generate Image")
+	Gui, ButtonEditor:Add, Button, x366 y142 w110 h28 vButtonEditorTestBtn gButtonEditorTest, % LD_T("button_editor.test", "Test")
+	Gui, ButtonEditor:Add, Button, x12 y178 w110 h28 vButtonEditorCreateFolderBtn gButtonEditorCreateFolder, % LD_T("button_editor.create_folder", "Create Folder")
+	Gui, ButtonEditor:Add, Button, x130 y178 w110 h28 vButtonEditorDeleteFolderBtn gButtonEditorDeleteFolder, % LD_T("button_editor.delete_folder", "Delete Folder")
+	Gui, ButtonEditor:Add, Button, x248 y178 w110 h28 vButtonEditorDeleteFunctionBtn gButtonEditorDeleteFunction, % LD_T("button_editor.delete_function", "Delete Function")
+	Gui, ButtonEditor:Add, Button, x366 y178 w110 h28 vButtonEditorScriptGeneratorBtn gButtonEditorScriptGenerator, % LD_T("button_editor.script_generator", "Script Gen")
+	Gui, ButtonEditor:Add, Button, x12 y214 w110 h28 vButtonEditorCopyButtonBtn gButtonEditorCopyButton, % LD_T("button_editor.copy_button", "Copy Button")
+	Gui, ButtonEditor:Add, Button, x130 y214 w110 h28 vButtonEditorPasteButtonBtn gButtonEditorPasteButton, % LD_T("button_editor.paste_button", "Paste Button")
+	Gui, ButtonEditor:Add, Button, x248 y214 w110 h28 vButtonEditorMoveButtonBtn gButtonEditorMoveButton, % LD_T("button_editor.move_button", "Move Button")
+	Gui, ButtonEditor:Add, Button, x366 y214 w110 h28 vButtonEditorSelectButtonBtn gButtonEditorSelectButton, % LD_T("button_editor.select_button", "Select")
+	Gui, ButtonEditor:Add, Button, x12 y250 w110 h28 vButtonEditorDeselectAllBtn gButtonEditorDeselectAll, % LD_T("button_editor.deselect_all", "Deselect All")
+	Gui, ButtonEditor:Add, Text, x130 y250 w346 h28 +Center +0x200 vButtonEditorSelectionTxt, % LD_T("button_editor.selection_count", "Selected: {count}", {count: 0})
+	Gui, ButtonEditor:Add, Text, x12 y286 w506 h23 +Center +0x200 vButtonEditorStatus, % LD_T("button_editor.ready", "Ready")
+	ButtonEditorUpdateActions(IdBoton)
+	Gui, ButtonEditor:Show, w532 h320, LibreDeck Button Editor
+}
+
+ButtonEditorPreviewSource(IdBoton)
+{
+	global btnPics
+	imageName := IdBoton ".png"
+	if(btnPics[imageName])
+		return "HBITMAP:*" btnPics[imageName]
+	if(btnPics["button_placeholder.png"])
+		return "HBITMAP:*" btnPics["button_placeholder.png"]
+	return ""
+}
+
+ButtonEditorRefreshInfo()
+{
+	global LD_ButtonEditorActiveId, conf
+	if(!WinExist("LibreDeck Button Editor") || LD_ButtonEditorActiveId = "")
+		return
+	IdBoton := LD_ButtonEditorActiveId
+	scriptPath := GetButtonScriptRelativePath(IdBoton, conf.extension)
+	folderInfo := GetButtonEditorFolderInfo(IdBoton)
+	GuiControl, ButtonEditor:, ButtonEditorDisplayTxt, % GetButtonDisplayId(IdBoton)
+	GuiControl, ButtonEditor:, ButtonEditorIsFolderChk, % folderInfo.isFolder
+	GuiControl, ButtonEditor:, ButtonEditorFolderTxt, % folderInfo.name
+	GuiControl, ButtonEditor:, ButtonEditorScriptTxt, %scriptPath%
+	GuiControl, ButtonEditor:, ButtonEditorPreview, % ButtonEditorPreviewSource(IdBoton)
+	ButtonEditorUpdateActions(IdBoton)
+	GuiControl, ButtonEditor:, ButtonEditorStatus, % LD_T("button_editor.updated", "Updated")
+}
+
+ButtonEditorUpdateActions(IdBoton)
+{
+	global conf, LD_ButtonClipboard, LD_ButtonMoveSource
+	selectedCount := LD_SelectedButtonCount()
+
+	folderInfo := GetButtonEditorFolderInfo(IdBoton)
+	scriptPath := GetButtonScriptRelativePath(IdBoton, conf.extension)
+	imagePath := GetButtonImageRelativePath(IdBoton)
+	hasScript := FileExist(A_ScriptDir "\" scriptPath) ? 1 : 0
+	hasImage := FileExist(A_ScriptDir "\" imagePath) ? 1 : 0
+	hasContent := hasScript || hasImage || folderInfo.isFolder
+	canPaste := LD_ClipboardHasButtons()
+	canMove := hasContent || selectedCount > 0 || LD_ButtonMoveSource != ""
+	canCopy := hasContent || selectedCount > 0
+
+	ButtonEditorSetControlEnabled("ButtonEditorCreateFolderBtn", !folderInfo.isFolder)
+	ButtonEditorSetControlEnabled("ButtonEditorDeleteFolderBtn", folderInfo.isFolder)
+	ButtonEditorSetControlEnabled("ButtonEditorDeleteFunctionBtn", hasScript || selectedCount > 0)
+	ButtonEditorSetControlEnabled("ButtonEditorCopyButtonBtn", canCopy)
+	ButtonEditorSetControlEnabled("ButtonEditorPasteButtonBtn", canPaste)
+	ButtonEditorSetControlEnabled("ButtonEditorMoveButtonBtn", canMove)
+	ButtonEditorSetControlEnabled("ButtonEditorSelectButtonBtn", !LD_IsButtonSelected(IdBoton))
+	ButtonEditorSetControlEnabled("ButtonEditorDeselectAllBtn", selectedCount > 0)
+	GuiControl, ButtonEditor:, ButtonEditorSelectionTxt, % LD_T("button_editor.selection_count", "Selected: {count}", {count: selectedCount})
+}
+
+ButtonEditorSetControlEnabled(controlName, enabled)
+{
+	if(enabled)
+		GuiControl, ButtonEditor:Enable, %controlName%
+	else
+		GuiControl, ButtonEditor:Disable, %controlName%
+}
+
+GetButtonEditorFolderInfo(IdBoton)
+{
+	global conf, EnCarpeta, CarpetaBoton
+
+	info := {}
+	info.isFolder := conf.folderButtons[IdBoton] != ""
+	if(info.isFolder)
+		info.name := conf.folderButtons[IdBoton]
+	else if(EnCarpeta && CarpetaBoton != "")
+		info.name := CarpetaBoton
+	else
+		info.name := "-"
+	return info
+}
+
+GetButtonDisplayId(IdBoton)
+{
+	global EnCarpeta, CarpetaBoton
+	displayId := IdBoton
+	if(EnCarpeta && CarpetaBoton != "" && SubStr(displayId, 1, StrLen(CarpetaBoton)) = CarpetaBoton)
+		displayId := SubStr(displayId, StrLen(CarpetaBoton) + 1)
+	return displayId
+}
+
+GetButtonVisualId(IdBoton)
+{
+	displayId := GetButtonDisplayId(IdBoton)
+	visualId := Mod(displayId, 15)
+	if(visualId = 0)
+		visualId := 15
+	return visualId
+}
+
+ButtonEditorEditScript:
+	EditarScriptBoton(LD_ButtonEditorActiveId)
+return
+
+ButtonEditorChangeImage:
+	EstablecerImagenBoton(LD_ButtonEditorActiveId)
+	ButtonEditorRefreshInfo()
+return
+
+ButtonEditorGenerateImage:
+	GenerarImagenBotonDefault(LD_ButtonEditorActiveId)
+	ButtonEditorRefreshInfo()
+return
+
+ButtonEditorTest:
+	EjecutarFuncionBoton(GetButtonVisualId(LD_ButtonEditorActiveId), LD_ButtonEditorActiveId)
+return
+
+ButtonEditorCreateFolder:
+	BotonActivo := LD_ButtonEditorActiveId
+	gosub, CreateFolderButton
+	ButtonEditorRefreshInfo()
+return
+
+ButtonEditorDeleteFolder:
+	BotonActivo := LD_ButtonEditorActiveId
+	gosub, DeleteFolderButton
+	ButtonEditorRefreshInfo()
+return
+
+ButtonEditorDeleteFunction:
+	BotonActivo := LD_ButtonEditorActiveId
+	gosub, DeleteButtonFunction
+	ButtonEditorRefreshInfo()
+return
+
+ButtonEditorScriptGenerator:
+	BotonActivo := LD_ButtonEditorActiveId
+	Menu scriptGenerator, Show
+	ButtonEditorRefreshInfo()
+return
+
+ButtonEditorCopyButton:
+	LD_CopyButton(LD_ButtonEditorActiveId)
+	ButtonEditorRefreshInfo()
+return
+
+ButtonEditorPasteButton:
+	LD_PasteButton(LD_ButtonEditorActiveId)
+	ButtonEditorRefreshInfo()
+return
+
+ButtonEditorMoveButton:
+	LD_MoveButton(LD_ButtonEditorActiveId)
+	ButtonEditorRefreshInfo()
+return
+
+ButtonEditorSelectButton:
+	LD_SelectButton(LD_ButtonEditorActiveId)
+	ButtonEditorRefreshInfo()
+return
+
+ButtonEditorDeselectAll:
+	LD_ClearButtonSelection()
+	ButtonEditorRefreshInfo()
+return
+
+ButtonEditorGuiClose:
+ButtonEditorGuiEscape:
+	Gui, ButtonEditor:Destroy
+return
+
 GetButtonScriptRelativePath(IdBoton, extension = "")
 {
 	global conf
@@ -1286,6 +1572,550 @@ CopyScriptToButton(sourcePath, IdBoton = "")
 	buttonPath := GetButtonScriptRelativePath(IdBoton, "ahk")
 	EnsureButtonScriptDirectory(buttonPath)
 	FileCopy, %sourcePath%, % A_ScriptDir "\" buttonPath, 1
+}
+
+GetButtonImageRelativePath(IdBoton)
+{
+	return "resources\img\" IdBoton ".png"
+}
+
+LD_CopyButton(IdBoton)
+{
+	global LD_ButtonClipboard
+
+	LD_ButtonClipboard := LD_BuildButtonClipboardFromSelectionOrButton(IdBoton)
+	setNotificationBottom(LD_T("button_menu.copy_done", "Button copied"), 1200)
+}
+
+LD_PasteButton(IdBoton)
+{
+	global LD_ButtonClipboard, conf
+
+	if(!LD_ClipboardHasButtons())
+	{
+		MsgBox,, % LD_T("button_menu.paste_title", "Paste Button"), % LD_T("button_menu.empty_clipboard", "Copy a button first.")
+		return
+	}
+	if(LD_ButtonClipboard.buttons.Length() = 1 && LD_ButtonClipboard.buttons[1].id = IdBoton)
+	{
+		MsgBox,, % LD_T("button_menu.paste_title", "Paste Button"), % LD_T("button_menu.same_button", "Choose a different button to paste into.")
+		return
+	}
+
+	targetIds := LD_GetSequentialButtonTargets(IdBoton, LD_ButtonClipboard.buttons.Length())
+	if(!LD_ConfirmOverwriteButtons(targetIds))
+		return
+
+	for index, clipData in LD_ButtonClipboard.buttons
+	{
+		targetId := targetIds[index]
+		LD_PasteButtonData(clipData, targetId)
+	}
+	gosub, guardarConfig
+	LD_ButtonsChanged(targetIds)
+	setNotificationBottom(LD_T("button_menu.paste_done", "Button pasted"), 1200)
+}
+
+LD_MoveButton(IdBoton)
+{
+	global LD_ButtonMoveSource, conf
+
+	selectedCount := LD_SelectedButtonCount()
+	if(selectedCount > 0)
+	{
+		moveClipboard := LD_BuildButtonClipboardFromSelectionOrButton(IdBoton)
+		moveDataList := moveClipboard.buttons
+		targetIds := LD_GetSequentialButtonTargets(IdBoton, moveDataList.Length())
+		if(!LD_ConfirmOverwriteButtons(targetIds))
+			return
+		for index, clipData in moveDataList
+		{
+			targetId := targetIds[index]
+			LD_PasteButtonData(clipData, targetId)
+		}
+		for index, clipData in moveDataList
+		{
+			if(!LD_ArrayContains(targetIds, clipData.id))
+				LD_ClearButton(clipData.id)
+		}
+		LD_ClearButtonSelection()
+		gosub, guardarConfig
+		LD_ButtonsChanged(targetIds)
+		LD_ButtonsChanged(LD_GetIdsFromClipDataList(moveDataList))
+		setNotificationBottom(LD_T("button_menu.move_done", "Button moved"), 1200)
+		return
+	}
+
+	if(LD_ButtonMoveSource = "")
+	{
+		LD_ButtonMoveSource := IdBoton
+		setNotificationBottom(LD_T("button_menu.move_select_destination", "Select destination button"), 1800)
+		return
+	}
+	if(LD_ButtonMoveSource = IdBoton)
+	{
+		LD_ButtonMoveSource := ""
+		setNotificationBottom(LD_T("button_menu.move_cancelled", "Move cancelled"), 1200)
+		return
+	}
+	if(!LD_ConfirmOverwriteButton(IdBoton))
+		return
+
+	moveData := LD_BuildButtonClipboardData(LD_ButtonMoveSource)
+	LD_PasteButtonData(moveData, IdBoton)
+	LD_ClearButton(LD_ButtonMoveSource)
+	LD_ButtonMoveSource := ""
+	gosub, guardarConfig
+	LD_ButtonChanged(moveData.id)
+	LD_ButtonChanged(IdBoton)
+	setNotificationBottom(LD_T("button_menu.move_done", "Button moved"), 1200)
+}
+
+LD_SelectButton(IdBoton)
+{
+	global LD_ButtonSelection, LD_ButtonSelectionMap
+
+	if(LD_ButtonSelectionMap[IdBoton])
+		return
+	LD_ButtonSelection.Push(IdBoton)
+	LD_ButtonSelectionMap[IdBoton] := 1
+	LD_RefreshSelectionIndicators()
+	setNotificationBottom(LD_T("button_menu.selection_added", "Button selected"), 900)
+}
+
+LD_ClearButtonSelection()
+{
+	global LD_ButtonSelection, LD_ButtonSelectionMap
+
+	LD_ButtonSelection := []
+	LD_ButtonSelectionMap := {}
+	LD_RefreshSelectionIndicators()
+	setNotificationBottom(LD_T("button_menu.selection_cleared", "Selection cleared"), 900)
+}
+
+LD_IsButtonSelected(IdBoton)
+{
+	global LD_ButtonSelectionMap
+
+	return LD_ButtonSelectionMap[IdBoton] ? 1 : 0
+}
+
+LD_SelectedButtonCount()
+{
+	global LD_ButtonSelection
+
+	if(IsObject(LD_ButtonSelection))
+		return LD_ButtonSelection.Length()
+	return 0
+}
+
+LD_BuildButtonClipboardFromSelectionOrButton(IdBoton)
+{
+	global LD_ButtonSelection
+
+	clipboardData := {}
+	clipboardData.buttons := []
+	if(LD_SelectedButtonCount() > 0)
+	{
+		for index, selectedId in LD_ButtonSelection
+			clipboardData.buttons.Push(LD_BuildButtonClipboardData(selectedId))
+	}
+	else
+	{
+		clipboardData.buttons.Push(LD_BuildButtonClipboardData(IdBoton))
+	}
+	clipboardData.id := clipboardData.buttons[1].id
+	return clipboardData
+}
+
+LD_ClipboardHasButtons()
+{
+	global LD_ButtonClipboard
+
+	return IsObject(LD_ButtonClipboard) && IsObject(LD_ButtonClipboard.buttons) && LD_ButtonClipboard.buttons.Length() > 0
+}
+
+LD_DeleteSelectedButtons()
+{
+	global LD_ButtonSelection, MsgBoxBtn1, MsgBoxBtn2
+
+	if(LD_SelectedButtonCount() = 0)
+		return
+	OnMessage(0x44, "OnMsgBox")
+	MsgBoxBtn1 := LD_T("button_menu.delete_selected", "Delete")
+	MsgBoxBtn2 := LD_T("button_menu.cancel", "Cancel")
+	MsgBox 0x34, % LD_T("button_menu.delete_selected_title", "Delete Selected Buttons?"), % LD_T("button_menu.delete_selected_prompt", "Delete scripts, images and folder links from selected buttons?")
+	OnMessage(0x44, "")
+	IfMsgBox No
+		return
+
+	changedIds := []
+	for index, selectedId in LD_ButtonSelection
+	{
+		LD_ClearButton(selectedId)
+		changedIds.Push(selectedId)
+	}
+	LD_ClearButtonSelection()
+	gosub, guardarConfig
+	LD_ButtonsChanged(changedIds)
+	setNotificationBottom(LD_T("button_menu.delete_selected_done", "Selected buttons deleted"), 1200)
+}
+
+LD_BuildButtonClipboardData(IdBoton)
+{
+	global conf
+
+	data := {}
+	data.id := IdBoton
+	data.scriptPath := GetButtonScriptRelativePath(IdBoton, conf.extension)
+	data.imagePath := GetButtonImageRelativePath(IdBoton)
+	data.scriptSnapshotPath := LD_CreateButtonClipboardSnapshot(data.scriptPath, "ahk")
+	data.imageSnapshotPath := LD_CreateButtonClipboardSnapshot(data.imagePath, "png")
+	data.folderName := conf.folderButtons[IdBoton]
+	return data
+}
+
+LD_CreateButtonClipboardSnapshot(relativePath, extension)
+{
+	sourcePath := A_ScriptDir "\" relativePath
+	if(!FileExist(sourcePath))
+		return ""
+	tempDir := A_Temp "\LibreDeckButtonClipboard"
+	FileCreateDir, %tempDir%
+	Random, randomId, 100000, 999999
+	targetPath := tempDir "\" A_Now A_MSec "_" randomId "." extension
+	FileCopy, %sourcePath%, %targetPath%, 1
+	return targetPath
+}
+
+LD_ButtonHasContent(IdBoton)
+{
+	global conf
+
+	scriptPath := GetButtonScriptRelativePath(IdBoton, conf.extension)
+	imagePath := GetButtonImageRelativePath(IdBoton)
+	return FileExist(A_ScriptDir "\" scriptPath) || FileExist(A_ScriptDir "\" imagePath) || conf.folderButtons[IdBoton] != ""
+}
+
+LD_ConfirmOverwriteButton(IdBoton)
+{
+	global MsgBoxBtn1, MsgBoxBtn2
+
+	if(!LD_ButtonHasContent(IdBoton))
+		return 1
+	OnMessage(0x44, "OnMsgBox")
+	MsgBoxBtn1 := LD_T("button_menu.overwrite", "Overwrite")
+	MsgBoxBtn2 := LD_T("button_menu.cancel", "Cancel")
+	MsgBox 0x34, % LD_T("button_menu.overwrite_title", "Overwrite Button?"), % LD_T("button_menu.overwrite_prompt", "This button already has content. Overwrite script, image and folder data?")
+	OnMessage(0x44, "")
+	IfMsgBox No
+		return 0
+	return 1
+}
+
+LD_ConfirmOverwriteButtons(targetIds)
+{
+	global MsgBoxBtn1, MsgBoxBtn2
+
+	for index, targetId in targetIds
+	{
+		if(LD_ButtonHasContent(targetId))
+		{
+			OnMessage(0x44, "OnMsgBox")
+			MsgBoxBtn1 := LD_T("button_menu.overwrite", "Overwrite")
+			MsgBoxBtn2 := LD_T("button_menu.cancel", "Cancel")
+			MsgBox 0x34, % LD_T("button_menu.overwrite_title", "Overwrite Button?"), % LD_T("button_menu.overwrite_many_prompt", "One or more destination buttons already have content. Overwrite scripts, images and folder data?")
+			OnMessage(0x44, "")
+			IfMsgBox No
+				return 0
+			return 1
+		}
+	}
+	return 1
+}
+
+LD_GetSequentialButtonTargets(startId, count)
+{
+	global EnCarpeta, CarpetaBoton, PaginaCarpeta, NumeroPagina
+
+	targetIds := []
+	startVisual := LD_GetButtonVisualIndexOnCurrentPage(startId)
+	if(!startVisual)
+		startVisual := 1
+	if(EnCarpeta)
+	{
+		prefix := CarpetaBoton
+		page := PaginaCarpeta
+	}
+	else
+	{
+		prefix := ""
+		page := NumeroPagina
+	}
+	Loop, %count%
+	{
+		visualIndex := startVisual + A_Index - 1
+		targetIds.Push(prefix 15*page+visualIndex)
+	}
+	return targetIds
+}
+
+LD_PasteButtonData(clipData, IdBoton)
+{
+	LD_PasteButtonScript(clipData, IdBoton)
+	LD_PasteButtonImage(clipData, IdBoton)
+	LD_PasteButtonFolder(clipData, IdBoton)
+}
+
+LD_ArrayContains(values, needle)
+{
+	for index, value in values
+	{
+		if(value = needle)
+			return 1
+	}
+	return 0
+}
+
+LD_GetIdsFromClipDataList(dataList)
+{
+	ids := []
+	for index, clipData in dataList
+		ids.Push(clipData.id)
+	return ids
+}
+
+LD_PasteButtonScript(clipData, IdBoton)
+{
+	global conf
+
+	sourcePath := clipData.scriptSnapshotPath != "" ? clipData.scriptSnapshotPath : A_ScriptDir "\" clipData.scriptPath
+	targetPath := GetButtonScriptRelativePath(IdBoton, conf.extension)
+	targetFullPath := A_ScriptDir "\" targetPath
+	if(FileExist(sourcePath))
+	{
+		EnsureButtonScriptDirectory(targetPath)
+		FileCopy, %sourcePath%, %targetFullPath%, 1
+	}
+	else if(FileExist(targetFullPath))
+	{
+		FileDelete, %targetFullPath%
+	}
+}
+
+LD_PasteButtonImage(clipData, IdBoton)
+{
+	global btnPics
+
+	sourcePath := clipData.imageSnapshotPath != "" ? clipData.imageSnapshotPath : A_ScriptDir "\" clipData.imagePath
+	targetPath := GetButtonImageRelativePath(IdBoton)
+	targetFullPath := A_ScriptDir "\" targetPath
+	imageName := IdBoton ".png"
+	if(btnPics[imageName])
+	{
+		DllCall("DeleteObject", "ptr", btnPics[imageName])
+		btnPics[imageName] := ""
+	}
+	if(FileExist(sourcePath))
+		FileCopy, %sourcePath%, %targetFullPath%, 1
+	else if(FileExist(targetFullPath))
+		FileDelete, %targetFullPath%
+
+	btnPics[imageName] := FileExist(targetFullPath) ? LoadPicture(targetFullPath) : ""
+}
+
+LD_PasteButtonFolder(clipData, IdBoton)
+{
+	global conf
+
+	if(clipData.folderName != "")
+		conf.folderButtons[IdBoton] := clipData.folderName
+	else
+		conf.folderButtons.delete(IdBoton)
+}
+
+LD_ClearButton(IdBoton)
+{
+	global conf, btnPics
+
+	scriptPath := GetButtonScriptRelativePath(IdBoton, conf.extension)
+	imagePath := GetButtonImageRelativePath(IdBoton)
+	imageName := IdBoton ".png"
+	if(FileExist(A_ScriptDir "\" scriptPath))
+		FileDelete, % A_ScriptDir "\" scriptPath
+	if(btnPics[imageName])
+	{
+		DllCall("DeleteObject", "ptr", btnPics[imageName])
+		btnPics[imageName] := ""
+	}
+	if(FileExist(A_ScriptDir "\" imagePath))
+		FileDelete, % A_ScriptDir "\" imagePath
+	conf.folderButtons.delete(IdBoton)
+}
+
+LD_RefreshCurrentPage()
+{
+	global EnCarpeta, CarpetaBoton, PaginaCarpeta, NumeroPagina
+
+	Gui, 1:Default
+	if(EnCarpeta)
+		EstablecerPaginaCarpeta(CarpetaBoton, PaginaCarpeta)
+	else
+		EstablecerPagina(NumeroPagina)
+}
+
+LD_ButtonChanged(IdBoton)
+{
+	global LD_ButtonEditorActiveId
+
+	LD_RefreshCurrentPage()
+	LD_RefreshButtonOnCurrentPage(IdBoton)
+	if(LD_ButtonEditorActiveId = IdBoton)
+		ButtonEditorRefreshInfo()
+}
+
+LD_ButtonsChanged(ids)
+{
+	global LD_ButtonEditorActiveId
+
+	LD_RefreshCurrentPage()
+	for index, IdBoton in ids
+	{
+		LD_RefreshButtonOnCurrentPage(IdBoton)
+		if(LD_ButtonEditorActiveId = IdBoton)
+			ButtonEditorRefreshInfo()
+	}
+}
+
+LD_RefreshSelectionIndicators()
+{
+	global EnCarpeta, CarpetaBoton, PaginaCarpeta, NumeroPagina
+
+	Gui, 1:Default
+	Loop, 15
+	{
+		visualIndex := A_Index
+		if(EnCarpeta)
+			buttonId := CarpetaBoton 15*PaginaCarpeta+visualIndex
+		else
+			buttonId := 15*NumeroPagina+visualIndex
+		activationControl := "Activar" visualIndex
+		if(LD_IsButtonSelected(buttonId))
+			GuiControl, Show, %activationControl%
+		else if(!LD_IsActivationFeedbackActive(activationControl))
+			GuiControl, Hide, %activationControl%
+	}
+}
+
+LD_IsActivationFeedbackActive(activationControl)
+{
+	global feedbackEjecucion
+
+	for index, activeControl in feedbackEjecucion
+	{
+		if(activeControl = activationControl)
+			return 1
+	}
+	return 0
+}
+
+LD_GetButtonVisualIndexOnCurrentPage(IdBoton)
+{
+	global EnCarpeta, CarpetaBoton, PaginaCarpeta, NumeroPagina
+
+	if(EnCarpeta)
+	{
+		prefix := CarpetaBoton
+		page := PaginaCarpeta
+	}
+	else
+	{
+		prefix := ""
+		page := NumeroPagina
+	}
+	Loop, 15
+	{
+		expectedId := prefix 15*page+A_Index
+		if(expectedId = IdBoton)
+			return A_Index
+	}
+	return 0
+}
+
+LD_RefreshButtonOnCurrentPage(IdBoton)
+{
+	global btnPics, EnCarpeta
+
+	Gui, 1:Default
+	visualIndex := LD_GetButtonVisualIndexOnCurrentPage(IdBoton)
+	if(!visualIndex)
+		return
+	if(EnCarpeta && visualIndex = 15)
+		imageName := "Volver.png"
+	else
+		imageName := IdBoton ".png"
+	if(imageName != "Volver.png")
+	{
+		if(btnPics[imageName])
+		{
+			DllCall("DeleteObject", "ptr", btnPics[imageName])
+			btnPics[imageName] := ""
+		}
+		imagePath := A_ScriptDir "\resources\img\" imageName
+		if(FileExist(imagePath))
+			btnPics[imageName] := LoadPicture(imagePath)
+	}
+	src := btnPics[imageName] ? "HBITMAP:*" btnPics[imageName] : "HBITMAP:*" btnPics["button_placeholder.png"]
+	controlName := "Boton" visualIndex
+	GuiControl, Text, %controlName%, %src%
+	LD_MoveDrawButton(visualIndex)
+	WinSet, Redraw,, LibreDeck Client
+}
+
+LD_MoveDrawButton(visualIndex)
+{
+	global conf
+
+	if(conf.miniClient)
+	{
+		if(visualIndex <= 5)
+		{
+			x := 59 + (visualIndex - 1) * 56
+			y := 19
+		}
+		else if(visualIndex <= 10)
+		{
+			x := 59 + (visualIndex - 6) * 56
+			y := 75
+		}
+		else
+		{
+			x := 59 + (visualIndex - 11) * 56
+			y := 131
+		}
+		size := 49
+	}
+	else
+	{
+		if(visualIndex <= 5)
+		{
+			x := 130 + (visualIndex - 1) * 160
+			y := 50
+		}
+		else if(visualIndex <= 10)
+		{
+			x := 130 + (visualIndex - 6) * 160
+			y := 230
+		}
+		else
+		{
+			x := 130 + (visualIndex - 11) * 160
+			y := 410
+		}
+		size := 130
+	}
+	controlName := "Boton" visualIndex
+	GuiControl, MoveDraw, %controlName%, x%x% y%y% w%size% h%size%
 }
 
 EditarScriptBoton(IdBoton)
@@ -1399,9 +2229,25 @@ OcultarFeedbackEjecucion:
 	{
 		SetTimer, OcultarFeedbackEjecucion, Off
 	}
-	GuiControl, Hide, % feedbackEjecucion[1]
+	feedbackControl := feedbackEjecucion[1]
 	feedbackEjecucion.remove(1)
+	if(!LD_IsSelectedActivationControl(feedbackControl))
+		GuiControl, Hide, %feedbackControl%
 return
+
+LD_IsSelectedActivationControl(activationControl)
+{
+	global EnCarpeta, CarpetaBoton, PaginaCarpeta, NumeroPagina
+
+	RegExMatch(activationControl, "\d+$", visualIndex)
+	if(visualIndex = "")
+		return 0
+	if(EnCarpeta)
+		buttonId := CarpetaBoton 15*PaginaCarpeta+visualIndex
+	else
+		buttonId := 15*NumeroPagina+visualIndex
+	return LD_IsButtonSelected(buttonId)
+}
 
 CreateFolderButton:
 	InputBox, nombreCarpetaNueva, Input Folder Name, Input the folder name WITHOUT spaces or weird symbols. Samples: (Programs`,GameFolder`,OBS_Buttons...)
@@ -1438,28 +2284,25 @@ CreateFolderButton:
 return
 
 DeleteFolderButton:
+	folderNameToDelete := conf.folderButtons[BotonActivo]
 	OnMessage(0x44, "OnMsgBox")
 	MsgBoxBtn1 = Delete
 	MsgBoxBtn2 = Cancel
 	MsgBox 0x34, Delete Folder?, This folder may contain other buttons or folders, delete it anyway?
 	OnMessage(0x44, "")
 	IfMsgBox Yes, {
-		OnMessage(0x44, "OnMsgBox")
-		MsgBoxBtn1 = Delete them
-		MsgBoxBtn2 = Cancel
-		MsgBox 0x34, Delete Inside?, You deleted the folder!`nDo you want to also remove buttons/folders that were inside of this folder?`nThis function is experimental, it is recommended that you delete those yourself!`n`nProceed Anyway?
-		OnMessage(0x44, "")
-		IfMsgBox Yes, {
-			if(conf.folderButtons[BotonActivo] != "")
+		if(LD_ConfirmPhysicalFolderDelete(folderNameToDelete))
+		{
+			if(folderNameToDelete != "")
 			{
-				FileRemoveDir, % A_ScriptDir "\buttons\" conf.folderButtons[BotonActivo], 1
-				FileRemoveDir, % A_ScriptDir "\resources\img\" conf.folderButtons[BotonActivo], 1
+				FileRemoveDir, % A_ScriptDir "\buttons\" folderNameToDelete, 1
+				FileRemoveDir, % A_ScriptDir "\resources\img\" folderNameToDelete, 1
 				/*
-				Loop, Files, % A_ScriptDir "\buttons\" conf.folderButtons[BotonActivo] "\*.ahk"
+				Loop, Files, % A_ScriptDir "\buttons\" folderNameToDelete "\*.ahk"
 				{
 					FileDelete, % A_LoopFileFullPath
 				}
-				Loop, Files, % A_ScriptDir "\resources\img\" conf.folderButtons[BotonActivo] "*.png"
+				Loop, Files, % A_ScriptDir "\resources\img\" folderNameToDelete "*.png"
 				{
 					FileDelete, % A_LoopFileFullPath
 				}
@@ -1474,24 +2317,37 @@ DeleteFolderButton:
 		MsgBox 0x34, Delete Icon?, Do you want to also remove this folder icon?
 		OnMessage(0x44, "")
 		IfMsgBox Yes, {
-			FileDelete,./resources/img/%BotonActivo%.png
 			DllCall("DeleteObject", "ptr", btnPics[BotonActivo ".png"]) ; Dispose image from memory
 			btnPics[BotonActivo ".png"] := ""
-			if(EnCarpeta)
-			{
-				EstablecerPaginaCarpeta(CarpetaBoton, PaginaCarpeta)
-			}
-			else
-			{
-				EstablecerPagina(NumeroPagina)	
-			}
+			FileDelete,./resources/img/%BotonActivo%.png
 		}
+		LD_ButtonChanged(BotonActivo)
 	}else{
 		return
 	}	
 return
 
+LD_ConfirmPhysicalFolderDelete(folderName)
+{
+	if(folderName = "")
+		return 0
+	title := LD_T("button_menu.delete_physical_folder_title", "Delete Physical Folder")
+	prompt := LD_T("button_menu.delete_physical_folder_prompt", "To delete the physical scripts folder from disk, type the folder name exactly:`n`n{folder}", {folder: folderName})
+	InputBox, typedFolderName, %title%, %prompt%, , 500, 180
+	if(ErrorLevel)
+		return 0
+	if(typedFolderName = folderName)
+		return 1
+	MsgBox,, %title%, % LD_T("button_menu.delete_physical_folder_mismatch", "Folder name did not match. The button folder link will be removed, but physical scripts will stay on disk.")
+	return 0
+}
+
 DeleteButtonFunction:
+	if(LD_SelectedButtonCount() > 0)
+	{
+		LD_DeleteSelectedButtons()
+		return
+	}
 	buttonPath := GetButtonScriptRelativePath(BotonActivo, "ahk")
 	if(FileExist(buttonPath))
 	{
@@ -1509,17 +2365,10 @@ DeleteButtonFunction:
 			MsgBox 0x34, Delete Icon?, Do you want to also remove this button icon?
 			OnMessage(0x44, "")
 			IfMsgBox Yes, {
-				FileDelete,./resources/img/%BotonActivo%.png
 				DllCall("DeleteObject", "ptr", btnPics[BotonActivo ".png"]) ; Dispose image from memory
 				btnPics[BotonActivo ".png"] := ""
-				if(EnCarpeta)
-				{
-					EstablecerPaginaCarpeta(CarpetaBoton, PaginaCarpeta)
-				}
-				else
-				{
-					EstablecerPagina(NumeroPagina)	
-				}
+				FileDelete,./resources/img/%BotonActivo%.png
+				LD_ButtonChanged(BotonActivo)
 			}
 		}
 	}
@@ -1532,12 +2381,12 @@ setStartPossition:
 	}
 	else
 	{
-		Gui startPos:Add, Text, x8 y8 w61 h23 +0x200, Initial X Pos:
-		Gui startPos:Add, Text, x8 y40 w60 h23 +0x200, Initial Y Pos:
+		Gui startPos:Add, Text, x8 y8 w61 h23 +0x200, % LD_T("start_pos.initial_x", "Initial X Pos:")
+		Gui startPos:Add, Text, x8 y40 w60 h23 +0x200, % LD_T("start_pos.initial_y", "Initial Y Pos:")
 		Gui startPos:Add, Edit, x72 y8 w120 h21 vx_Inicial +Center +Number, % conf.x_Inicial
 		Gui startPos:Add, Edit, x72 y40 w120 h21 vy_Inicial +Center +Number, % conf.y_Inicial
-		Gui startPos:Add, Button, x112 y72 w80 h23 gsaveStartPossition, Set and Save
-		Gui startPos:Add, Button, x8 y72 w80 h23 ggetCurrentPos, Get current
+		Gui startPos:Add, Button, x102 y72 w90 h23 gsaveStartPossition, % LD_T("start_pos.set_and_save", "Set and Save")
+		Gui startPos:Add, Button, x8 y72 w86 h23 ggetCurrentPos, % LD_T("start_pos.get_current", "Get current")
 		Gui startPos:Show, w200 h103, LibreDeck Start Pos
 	}
 return
@@ -1561,13 +2410,13 @@ return
 guardarConfig:
 	if(!conf.online){
 		FileDelete, ./conf/config.json
-		FileAppend, % JSON_Beautify(BuildJson(conf)), ./conf/config.json
+		FileAppend, % JSON.Dump(conf, 1), ./conf/config.json
 	}
 return
 
 guardarConfigCambioOnline:
 	FileDelete, ./conf/config.json
-	FileAppend, % JSON_Beautify(BuildJson(conf)), ./conf/config.json
+	FileAppend, % JSON.Dump(conf, 1), ./conf/config.json
 return
 
 startPosguiEscape:
@@ -1645,14 +2494,14 @@ GetOut:
 ; NETWORKING MODULE
 EnviarTCP(txtSnd)
 {
-	global conf
+	global conf, tcpCon
 	txtSnd := conf.isGolangServer ? txtSnd "`n" : txtSnd
     tcpCon.sendText(txtSnd)
 }
 
 OnTcpRecv(this)
 {
-	global conf
+	global conf, feedbackEjecucion
 	if (conf.isGolangServer)
 		StringReplace, txtBtnRecv, % this.recvText(), `n,,All
 	else
@@ -1661,6 +2510,124 @@ OnTcpRecv(this)
 	GuiControl, Show, %Activacion%
 	feedbackEjecucion.push(Activacion)
 	SetTimer, OcultarFeedbackEjecucion, 150
+}
+
+OnTcpDisconnect(this)
+{
+	global serverFound, LD_ReconnectAttemptCount
+
+	serverFound := 0
+	LD_ReconnectAttemptCount := 0
+	RefreshWifiIcon()
+	if(WinExist("LibreDeck Network Settings"))
+	{
+		GuiControl, networkSettings:+cRed, NetworkStatusInfo
+		GuiControl, networkSettings:Text, NetworkStatusInfo, % LD_T("network.status_connection_lost", "Connection lost. Reconnecting...")
+	}
+	SetTimer, LibreDeckConnectionWatchdog, 5000
+}
+
+LibreDeckConnectionWatchdog:
+	if(!conf.online)
+	{
+		SetTimer, LibreDeckConnectionWatchdog, Off
+		return
+	}
+	if(serverFound)
+		return
+	if(LD_ReconnectAttemptCount >= 1)
+	{
+		LibreDeckSwitchToOfflineMode(LD_T("network.status_offline_after_failed_reconnect", "Connection failed twice. Offline mode enabled."))
+		return
+	}
+	LD_ReconnectAttemptCount++
+	if(LibreDeckReconnectConfiguredServer())
+	{
+		LD_ReconnectAttemptCount := 0
+		gosub, downloadServerProfile
+	}
+	else
+	{
+		LibreDeckSwitchToOfflineMode(LD_T("network.status_offline_after_failed_reconnect", "Connection failed twice. Offline mode enabled."))
+		return
+	}
+	gosub, setWifiIcon
+return
+
+LibreDeckReconnectConfiguredServer()
+{
+	global conf, tcpCon, serverFound
+
+	if(!LibreDeckAttemptServerConnection(conf.ip, conf.port))
+	{
+		serverFound := 0
+		if(WinExist("LibreDeck Network Settings"))
+		{
+			GuiControl, networkSettings:+cRed, NetworkStatusInfo
+			GuiControl, networkSettings:Text, NetworkStatusInfo, % LD_T("network.status_reconnect_failed", "Reconnect failed: {error}", {error: tcpCon.errorNM})
+		}
+		return false
+	}
+	serverFound := 1
+	if(WinExist("LibreDeck Network Settings"))
+	{
+		GuiControl, networkSettings:+cGreen, NetworkStatusInfo
+		GuiControl, networkSettings:Text, NetworkStatusInfo, % LD_T("network.status_reconnected", "Reconnected to the server!")
+	}
+	return true
+}
+
+LibreDeckAttemptServerConnection(ip, port)
+{
+	global tcpCon, LD_TCP_CONNECT_TIMEOUT_MS
+
+	if(IsObject(tcpCon))
+		tcpCon.disconnect()
+	tcpCon := new SocketTCP()
+	connected := tcpCon.connect(ip, port, LD_TCP_CONNECT_TIMEOUT_MS)
+	tcpCon.onRecv := Func("OnTcpRecv")
+	tcpCon.onDisconnect := Func("OnTcpDisconnect")
+	return connected
+}
+
+LibreDeckConnectWithRetry(ip, port, attempts := 2)
+{
+	Loop, %attempts%
+	{
+		if(LibreDeckAttemptServerConnection(ip, port))
+			return true
+		if(A_Index < attempts)
+			Sleep, 150
+	}
+	return false
+}
+
+LibreDeckSwitchToOfflineMode(statusText := "", updateGui := true)
+{
+	global conf, tcpCon, serverFound, LD_ReconnectAttemptCount
+
+	if(IsObject(tcpCon))
+		tcpCon.disconnect()
+	FileRead, localConfigJson, ./conf/config.json
+	localConf := JSON.Load(localConfigJson)
+	if(IsObject(localConf))
+		conf := localConf
+	conf.online := 0
+	serverFound := 0
+	LD_ReconnectAttemptCount := 0
+	SetTimer, LibreDeckConnectionWatchdog, Off
+	LibreDeckSaveConfig()
+	if(!updateGui)
+		return
+	RefreshWifiIcon()
+	if(WinExist("LibreDeck Network Settings"))
+	{
+		GuiControl, networkSettings:, OnlineChk, 0
+		GuiControl, networkSettings:+cRed, NetworkStatusInfo
+		if(statusText = "")
+			statusText := LD_T("network.status_offline_after_failed_reconnect", "Connection failed twice. Offline mode enabled.")
+		GuiControl, networkSettings:Text, NetworkStatusInfo, %statusText%
+	}
 }
 
 crearGuiNetworkSettings:
@@ -1672,39 +2639,59 @@ crearGuiNetworkSettings:
 	{
 		interfaceList := LibreDeckDiscoveryBuildInterfaceList()
 		if(conf.online)
-			Gui networkSettings:Add, CheckBox, x16 y8 w120 h23 vOnlineChk checked, Online Mode
+			Gui networkSettings:Add, CheckBox, x16 y8 w120 h23 vOnlineChk checked, % LD_T("network.online_mode", "Online Mode")
 		else
-			Gui networkSettings:Add, CheckBox, x16 y8 w120 h23 vOnlineChk, Online Mode
-		Gui networkSettings:Add, Text, x16 y40 w43 h23 +0x200, IP:
-		Gui networkSettings:Add, Text, x16 y72 w43 h23 +0x200, Port:
-		Gui networkSettings:Add, Text, x16 y104 w43 h23 +0x200, Res Port:
+			Gui networkSettings:Add, CheckBox, x16 y8 w120 h23 vOnlineChk, % LD_T("network.online_mode", "Online Mode")
+		Gui networkSettings:Add, Text, x16 y40 w43 h23 +0x200, % LD_T("network.ip", "IP:")
+		Gui networkSettings:Add, Text, x16 y72 w43 h23 +0x200, % LD_T("network.port", "Port:")
+		Gui networkSettings:Add, Text, x16 y104 w43 h23 +0x200, % LD_T("network.resource_port", "Res Port:")
+		Gui networkSettings:Add, Text, x200 y40 w65 h23 +0x200, % LD_T("network.nickname", "Nickname:")
 		Gui networkSettings:Add, Edit, +Center x64 y40 w120 h21 vIpTxt, % conf.ip
 		Gui networkSettings:Add, Edit, +Center x64 y72 w120 h21 vPortTxt, % conf.port
 		Gui networkSettings:Add, Edit, +Center x64 y104 w120 h21 vResourcesPortTxt, % conf.resourcesPort
-		Gui networkSettings:Add, Button, x16 y136 w80 h23 gSaveNetworkConfig, SAVE CONFIG
-		Gui networkSettings:Add, Button, x104 y136 w80 h23 gConnectToServer, CONNECT
+		Gui networkSettings:Add, Edit, +Center x270 y40 w263 h21 vNicknameTxt, % LibreDeckProfileGetNickname(conf.ip, conf.port, conf.resourcesPort)
+		Gui networkSettings:Add, Button, x16 y136 w80 h23 gSaveNetworkConfig, % LD_T("network.save_config", "SAVE CONFIG")
+		Gui networkSettings:Add, Button, x104 y136 w80 h23 gConnectToServer, % LD_T("network.connect", "CONNECT")
 		Gui networkSettings:Add, Text, x0 y168 w548 h2 +0x10 ; Separator
-		Gui networkSettings:Add, Text, x16 y180 w95 h23 +0x200, Interface:
+		Gui networkSettings:Add, Text, x16 y180 w95 h23 +0x200, % LD_T("network.interface", "Interface:")
 		Gui networkSettings:Add, DropDownList, x88 y180 w445 vDiscoveryInterfaceChoice gNetworkDiscoveryInterfaceChanged, %interfaceList%
-		Gui networkSettings:Add, Text, x16 y212 w95 h23 +0x200, Broadcast:
+		Gui networkSettings:Add, Text, x16 y212 w95 h23 +0x200, % LD_T("network.broadcast", "Broadcast:")
 		Gui networkSettings:Add, Edit, +Center x88 y212 w145 h21 vDiscoveryBroadcastTxt ReadOnly
-		Gui networkSettings:Add, Text, x248 y212 w80 h23 +0x200, UDP:
+		Gui networkSettings:Add, Text, x248 y212 w80 h23 +0x200, % LD_T("network.udp", "UDP:")
 		Gui networkSettings:Add, Edit, +Center x285 y212 w70 h21 vDiscoveryPortTxt Number, % LD_DiscoveryPort
-		Gui networkSettings:Add, Text, x368 y212 w72 h23 +0x200, Local UDP:
+		Gui networkSettings:Add, Text, x368 y212 w72 h23 +0x200, % LD_T("network.local_udp", "Local UDP:")
 		Gui networkSettings:Add, Edit, +Center x436 y212 w55 h21 vDiscoveryLocalUdpPortTxt Number, % LD_DiscoveryLocalUdpPort
-		Gui networkSettings:Add, Button, x16 y244 w110 h23 gNetworkDiscoveryRefresh, DISCOVER
-		Gui networkSettings:Add, Text, x136 y244 w397 h23 +0x200 vNetworkDiscoveryStatus, Discovery ready
-		Gui networkSettings:Add, ListView, x16 y276 w517 h150 vNetworkDiscoveryServerList gNetworkDiscoveryServerSelected, Name|IP|Port|Res|Ver|Last Seen
+		Gui networkSettings:Add, Button, x16 y244 w110 h23 gNetworkDiscoveryRefresh, % LD_T("network.discover", "DISCOVER")
+		Gui networkSettings:Add, Text, x136 y244 w397 h23 +0x200 vNetworkDiscoveryStatus, % LD_T("network.discovery_ready", "Discovery ready")
+		discoveryColumns := LD_T("network.servers_name", "Name") "|" LD_T("network.servers_ip", "IP") "|" LD_T("network.servers_port", "Port") "|" LD_T("network.servers_resource", "Res") "|" LD_T("network.servers_version", "Ver") "|" LD_T("network.servers_last_seen", "Last Seen")
+		Gui networkSettings:Add, ListView, x16 y276 w517 h150 vNetworkDiscoveryServerList gNetworkDiscoveryServerSelected, %discoveryColumns%
 		Gui networkSettings:Add, Text, x0 y438 w548 h2 +0x10 ; Separator
-		Gui networkSettings:Add, Text, x8 y439 w525 h23 +Center +0x200 vNetworkStatusInfo, LibreDeck - Network Config
+		Gui networkSettings:Add, Text, x16 y448 w150 h23 +0x200, % LD_T("network.saved_profiles", "Saved profiles:")
+		Gui networkSettings:Add, Button, x178 y448 w85 h23 gNetworkProfileRename, % LD_T("network.profile_rename", "RENAME")
+		Gui networkSettings:Add, Button, x270 y448 w85 h23 gNetworkProfileFavorite, % LD_T("network.profile_favorite", "FAVORITE")
+		Gui networkSettings:Add, Button, x362 y448 w85 h23 gNetworkProfileDelete, % LD_T("network.profile_delete", "DELETE")
+		Gui networkSettings:Add, Button, x454 y448 w79 h23 gNetworkProfileConnect, % LD_T("network.connect", "CONNECT")
+		profileColumns := LD_T("network.profile_fav", "Fav") "|" LD_T("network.profile_nickname", "Nickname") "|" LD_T("network.servers_ip", "IP") "|" LD_T("network.servers_port", "Port") "|" LD_T("network.servers_resource", "Res") "|" LD_T("network.profile_last_connected", "Last Connected")
+		Gui networkSettings:Add, ListView, x16 y474 w517 h120 vNetworkProfileList gNetworkProfileSelected, %profileColumns%
+		Gui networkSettings:Add, Text, x0 y606 w548 h2 +0x10 ; Separator
+		Gui networkSettings:Add, Text, x8 y607 w525 h23 +Center +0x200 vNetworkStatusInfo, % LD_T("network.status_default", "LibreDeck - Network Config")
 		Gui networkSettings:Default
+		Gui, ListView, NetworkDiscoveryServerList
 		LV_ModifyCol(1, 145)
 		LV_ModifyCol(2, 115)
 		LV_ModifyCol(3, 55)
 		LV_ModifyCol(4, 55)
 		LV_ModifyCol(5, 45)
 		LV_ModifyCol(6, 85)
-		Gui networkSettings:Show, w548 h466, LibreDeck Network Settings
+		Gui, ListView, NetworkProfileList
+		LV_ModifyCol(1, 35)
+		LV_ModifyCol(2, 145)
+		LV_ModifyCol(3, 105)
+		LV_ModifyCol(4, 50)
+		LV_ModifyCol(5, 45)
+		LV_ModifyCol(6, 95)
+		Gui networkSettings:Show, w548 h634, LibreDeck Network Settings
+		LibreDeckProfilesRefreshList()
 		gosub, NetworkDiscoveryInterfaceChanged
 		gosub, NetworkDiscoveryRefresh
 	}
@@ -1729,7 +2716,7 @@ SaveNetworkConfig:
 	conf.resourcesPort := ResourcesPortTxt
 	gosub, guardarConfigCambioOnline
 	GuiControl, networkSettings:+cBlue, NetworkStatusInfo
-	GuiControl, networkSettings:Text, NetworkStatusInfo, Config Saved!
+	GuiControl, networkSettings:Text, NetworkStatusInfo, % LD_T("network.status_config_saved", "Config Saved!")
 	if(mustReload)
 	{
 		reload
@@ -1740,29 +2727,36 @@ ConnectToServer:
 	GuiControlGet, OnlineChk, networkSettings:, OnlineChk
 	if(!OnlineChk)
 	{
-		MsgBox, % "Enable online mode first!"
+		MsgBox, % LD_T("network.enable_online_first", "Enable online mode first!")
 		return
 	}
 	GuiControlGet, IpTxt, networkSettings:, IpTxt
 	GuiControlGet, PortTxt, networkSettings:, PortTxt
 	GuiControlGet, ResourcesPortTxt, networkSettings:, ResourcesPortTxt
+	GuiControlGet, NicknameTxt, networkSettings:, NicknameTxt
 	GuiControl, networkSettings:+cBlack, NetworkStatusInfo
-	GuiControl, networkSettings:Text, NetworkStatusInfo, Connecting...
-	tcpCon := new SocketTCP()
-	tcpCon.connect(IpTxt, PortTxt)
-	tcpCon.onRecv := Func("OnTcpRecv")
-	if(tcpCon.errorNM != "")
+	GuiControl, networkSettings:Text, NetworkStatusInfo, % LD_T("network.status_connecting", "Connecting...")
+	conf.ip := IpTxt
+	conf.port := PortTxt
+	conf.resourcesPort := ResourcesPortTxt
+	if(!LibreDeckConnectWithRetry(IpTxt, PortTxt, LD_TCP_CONNECT_ATTEMPTS))
 	{
-		serverFound := 0
+		LibreDeckSwitchToOfflineMode(LD_T("network.status_offline_after_failed_reconnect", "Connection failed twice. Offline mode enabled."))
 		GuiControl, networkSettings:+cRed, NetworkStatusInfo
-		GuiControl, networkSettings:Text, NetworkStatusInfo, Could not connect!
+		GuiControl, networkSettings:Text, NetworkStatusInfo, % LD_T("network.status_connect_failed_offline", "Could not connect. Offline mode enabled.")
 	}
 	else
 	{
 		serverFound := 1
+		LD_ReconnectAttemptCount := 0
+		SetTimer, LibreDeckConnectionWatchdog, 5000
+		LD_NetworkConfigSkipReload := true
 		gosub, SaveNetworkConfig
+		LD_NetworkConfigSkipReload := false
+		LibreDeckProfileSaveSuccessfulConnection(IpTxt, PortTxt, ResourcesPortTxt, NicknameTxt, LD_CurrentDiscoveredServerName)
+		LibreDeckProfilesRefreshList()
 		GuiControl, networkSettings:+cGreen, NetworkStatusInfo
-		GuiControl, networkSettings:Text, NetworkStatusInfo, Connected to the server!
+		GuiControl, networkSettings:Text, NetworkStatusInfo, % LD_T("network.status_connected", "Connected to the server!")
 		gosub, downloadServerProfile
 	}
 	gosub, setWifiIcon
@@ -1776,6 +2770,12 @@ return
 
 NetworkDiscoveryInterfaceChanged:
 	Gui, networkSettings:Submit, NoHide
+	if(DiscoveryInterfaceChoice = "All interfaces")
+	{
+		LD_DiscoveryBroadcastIP := "All interfaces"
+		GuiControl, networkSettings:, DiscoveryBroadcastTxt, All interfaces
+		return
+	}
 	if(!LD_DiscoveryInterfaces.HasKey(DiscoveryInterfaceChoice))
 		return
 	selected := LD_DiscoveryInterfaces[DiscoveryInterfaceChoice]
@@ -1793,15 +2793,16 @@ NetworkDiscoveryRefresh:
 	LD_DiscoveryDiscovering := true
 	LD_DiscoveryServers := {}
 	Gui, networkSettings:Default
+	Gui, ListView, NetworkDiscoveryServerList
 	LV_Delete()
-	GuiControl, networkSettings:, NetworkDiscoveryStatus, % "Discovering " LD_DiscoveryBroadcastIP "..."
+	GuiControl, networkSettings:, NetworkDiscoveryStatus, % LD_T("network.discovery_discovering", "Discovering {target}...", {target: LD_DiscoveryBroadcastIP})
 
 	message := "LIBREDECK_DISCOVER|name=" A_ComputerName
-	sent := LD_SendToIP(LD_DiscoverySock, message, LD_DiscoveryBroadcastIP, LD_DiscoveryPort)
-	if(sent = -1)
+	sentCount := LibreDeckDiscoverySendDiscover(message)
+	if(sentCount < 1)
 	{
 		err := LD_GetLastError()
-		GuiControl, networkSettings:, NetworkDiscoveryStatus, sendto error %err%
+		GuiControl, networkSettings:, NetworkDiscoveryStatus, % LD_T("network.discovery_send_error", "sendto error {error}", {error: err})
 		LD_DiscoveryDiscovering := false
 		return
 	}
@@ -1811,8 +2812,9 @@ return
 NetworkDiscoveryFinish:
 	LD_DiscoveryDiscovering := false
 	Gui, networkSettings:Default
+	Gui, ListView, NetworkDiscoveryServerList
 	count := LV_GetCount()
-	GuiControl, networkSettings:, NetworkDiscoveryStatus, Found %count% server(s)
+	GuiControl, networkSettings:, NetworkDiscoveryStatus, % LD_T("network.discovery_found", "Found {count} server(s)", {count: count})
 return
 
 NetworkDiscoveryServerSelected:
@@ -1824,10 +2826,48 @@ NetworkDiscoveryServerSelected:
 	NetworkDiscoveryFillConnectionForm(row)
 	if(A_GuiEvent = "DoubleClick")
 	{
-		LD_NetworkConfigSkipReload := true
 		gosub, ConnectToServer
-		LD_NetworkConfigSkipReload := false
 	}
+return
+
+NetworkProfileSelected:
+	if(A_GuiEvent != "Normal" && A_GuiEvent != "DoubleClick")
+		return
+	row := A_EventInfo
+	if(!row)
+		return
+	NetworkProfileFillConnectionForm(row)
+	if(A_GuiEvent = "DoubleClick")
+		gosub, ConnectToServer
+return
+
+NetworkProfileConnect:
+	row := NetworkProfileGetSelectedRow()
+	if(!row)
+		return
+	NetworkProfileFillConnectionForm(row)
+	gosub, ConnectToServer
+return
+
+NetworkProfileRename:
+	row := NetworkProfileGetSelectedRow()
+	if(!row)
+		return
+	NetworkProfileRenameSelected(row)
+return
+
+NetworkProfileFavorite:
+	row := NetworkProfileGetSelectedRow()
+	if(!row)
+		return
+	NetworkProfileSetFavorite(row)
+return
+
+NetworkProfileDelete:
+	row := NetworkProfileGetSelectedRow()
+	if(!row)
+		return
+	NetworkProfileDeleteSelected(row)
 return
 
 LibreDeckDiscoveryApplyClientSettings()
@@ -1837,37 +2877,45 @@ LibreDeckDiscoveryApplyClientSettings()
 
 	Gui, networkSettings:Submit, NoHide
 
-	if(!LD_DiscoveryInterfaces.HasKey(DiscoveryInterfaceChoice))
+	if(DiscoveryInterfaceChoice != "All interfaces" && !LD_DiscoveryInterfaces.HasKey(DiscoveryInterfaceChoice))
 	{
 		GuiControl, networkSettings:+cRed, NetworkDiscoveryStatus
-		GuiControl, networkSettings:, NetworkDiscoveryStatus, Select a network interface
+		GuiControl, networkSettings:, NetworkDiscoveryStatus, % LD_T("network.discovery_select_interface", "Select a network interface")
 		return false
 	}
 	if(DiscoveryPortTxt < 1 || DiscoveryPortTxt > 65535)
 	{
 		GuiControl, networkSettings:+cRed, NetworkDiscoveryStatus
-		GuiControl, networkSettings:, NetworkDiscoveryStatus, Discovery UDP port must be 1-65535
+		GuiControl, networkSettings:, NetworkDiscoveryStatus, % LD_T("network.discovery_invalid_port", "Discovery UDP port must be 1-65535")
 		return false
 	}
 	if(DiscoveryLocalUdpPortTxt < 0 || DiscoveryLocalUdpPortTxt > 65535)
 	{
 		GuiControl, networkSettings:+cRed, NetworkDiscoveryStatus
-		GuiControl, networkSettings:, NetworkDiscoveryStatus, Local UDP must be 0-65535
+		GuiControl, networkSettings:, NetworkDiscoveryStatus, % LD_T("network.discovery_invalid_local_udp", "Local UDP must be 0-65535")
 		return false
 	}
 
-	selected := LD_DiscoveryInterfaces[DiscoveryInterfaceChoice]
 	LD_DiscoveryPort := DiscoveryPortTxt
 	LD_DiscoveryLocalUdpPort := DiscoveryLocalUdpPortTxt
-	LD_DiscoveryLocalIP := selected.ip
-	LD_DiscoveryBroadcastIP := LibreDeckDiscoveryCalculateBroadcast(selected.ip, selected.mask)
+	if(DiscoveryInterfaceChoice = "All interfaces")
+	{
+		LD_DiscoveryLocalIP := ""
+		LD_DiscoveryBroadcastIP := "All interfaces"
+	}
+	else
+	{
+		selected := LD_DiscoveryInterfaces[DiscoveryInterfaceChoice]
+		LD_DiscoveryLocalIP := selected.ip
+		LD_DiscoveryBroadcastIP := LibreDeckDiscoveryCalculateBroadcast(selected.ip, selected.mask)
+	}
 	GuiControl, networkSettings:, DiscoveryBroadcastTxt, %LD_DiscoveryBroadcastIP%
 
 	StopLibreDeckDiscoveryClient()
 	if(!StartLibreDeckDiscoveryClient())
 	{
 		GuiControl, networkSettings:+cRed, NetworkDiscoveryStatus
-		GuiControl, networkSettings:, NetworkDiscoveryStatus, Could not start discovery socket
+		GuiControl, networkSettings:, NetworkDiscoveryStatus, % LD_T("network.discovery_socket_error", "Could not start discovery socket")
 		return false
 	}
 
@@ -1877,8 +2925,9 @@ LibreDeckDiscoveryApplyClientSettings()
 
 StartLibreDeckDiscoveryClient()
 {
-	global LD_DiscoverySock, LD_DiscoverySocketCallback, LD_DiscoveryWinsockStarted
+	global LD_DiscoverySocks, LD_DiscoverySock, LD_DiscoverySocketCallback, LD_DiscoveryWinsockStarted
 	global LD_DiscoveryLocalUdpPort, LD_DiscoveryLocalIP, LD_DISCOVERY_SOCKET_MSG, LD_DISCOVERY_FD_READ
+	global DiscoveryInterfaceChoice, LD_DiscoveryInterfaces
 
 	if(!LD_DiscoveryWinsockStarted)
 	{
@@ -1887,52 +2936,75 @@ StartLibreDeckDiscoveryClient()
 		LD_DiscoveryWinsockStarted := true
 	}
 
-	LD_DiscoverySock := LD_CreateUdpSocket()
-	if(LD_DiscoverySock = -1)
-		return false
-
-	if(!LD_Bind(LD_DiscoverySock, LD_DiscoveryLocalUdpPort, LD_DiscoveryLocalIP))
+	LD_DiscoverySocks := []
+	if(DiscoveryInterfaceChoice = "All interfaces")
 	{
-		LD_CloseSocket(LD_DiscoverySock)
-		LD_DiscoverySock := -1
-		return false
+		for label, selected in LD_DiscoveryInterfaces
+			LibreDeckDiscoveryCreateClientSocket(selected.ip)
+	}
+	else
+	{
+		LibreDeckDiscoveryCreateClientSocket(LD_DiscoveryLocalIP)
 	}
 
-	if(!LD_SetBroadcast(LD_DiscoverySock, true))
+	if(LD_DiscoverySocks.MaxIndex() = "")
+		return false
+
+	LD_DiscoverySock := LD_DiscoverySocks[1].sock
+	return true
+}
+
+LibreDeckDiscoveryCreateClientSocket(localIP)
+{
+	global LD_DiscoverySocks, LD_DiscoverySocketCallback, LD_DiscoveryLocalUdpPort, LD_DISCOVERY_SOCKET_MSG, LD_DISCOVERY_FD_READ
+
+	sock := LD_CreateUdpSocket()
+	if(sock = -1)
+		return false
+	if(!LD_Bind(sock, LD_DiscoveryLocalUdpPort, localIP))
 	{
-		LD_CloseSocket(LD_DiscoverySock)
-		LD_DiscoverySock := -1
+		LD_CloseSocket(sock)
 		return false
 	}
-
+	if(!LD_SetBroadcast(sock, true))
+	{
+		LD_CloseSocket(sock)
+		return false
+	}
 	if(LD_DiscoverySocketCallback = "")
 		LD_DiscoverySocketCallback := Func("LibreDeckDiscoverySocketMessage")
 	OnMessage(LD_DISCOVERY_SOCKET_MSG, LD_DiscoverySocketCallback)
 
-	if(!LD_RegisterAsync(LD_DiscoverySock, LD_DISCOVERY_SOCKET_MSG, LD_DISCOVERY_FD_READ))
+	if(!LD_RegisterAsync(sock, LD_DISCOVERY_SOCKET_MSG, LD_DISCOVERY_FD_READ))
 	{
-		OnMessage(LD_DISCOVERY_SOCKET_MSG, LD_DiscoverySocketCallback, 0)
-		LD_CloseSocket(LD_DiscoverySock)
-		LD_DiscoverySock := -1
+		LD_CloseSocket(sock)
 		return false
 	}
 
+	entry := {}
+	entry.sock := sock
+	entry.localIP := localIP
+	LD_DiscoverySocks.Push(entry)
 	return true
 }
 
 StopLibreDeckDiscoveryClient()
 {
-	global LD_DiscoverySock, LD_DiscoverySocketCallback, LD_DiscoveryDiscovering, LD_DISCOVERY_SOCKET_MSG
+	global LD_DiscoverySocks, LD_DiscoverySock, LD_DiscoverySocketCallback, LD_DiscoveryDiscovering, LD_DISCOVERY_SOCKET_MSG
 
 	SetTimer, NetworkDiscoveryFinish, Off
 	LD_DiscoveryDiscovering := false
-	if(LD_DiscoverySock = -1)
+	if(LD_DiscoverySocks.MaxIndex() = "" && LD_DiscoverySock = -1)
 		return
 
 	if(LD_DiscoverySocketCallback != "")
 		OnMessage(LD_DISCOVERY_SOCKET_MSG, LD_DiscoverySocketCallback, 0)
-	LD_UnregisterAsync(LD_DiscoverySock, LD_DISCOVERY_SOCKET_MSG)
-	LD_CloseSocket(LD_DiscoverySock)
+	for index, entry in LD_DiscoverySocks
+	{
+		LD_UnregisterAsync(entry.sock, LD_DISCOVERY_SOCKET_MSG)
+		LD_CloseSocket(entry.sock)
+	}
+	LD_DiscoverySocks := []
 	LD_DiscoverySock := -1
 }
 
@@ -1950,21 +3022,59 @@ LibreDeckDiscoveryShutdown()
 
 LibreDeckDiscoverySocketMessage(wParam, lParam, msg, hwnd)
 {
-	global LD_DiscoverySock, LD_DiscoveryDiscovering, LD_DISCOVERY_FD_READ
+	global LD_DiscoverySocks, LD_DiscoveryDiscovering, LD_DISCOVERY_FD_READ
 
-	if(wParam != LD_DiscoverySock)
+	if(!LibreDeckDiscoveryIsKnownSocket(wParam))
 		return
 	if(LD_AsyncError(lParam))
 		return
 	if(LD_AsyncEvent(lParam) != LD_DISCOVERY_FD_READ)
 		return
 
-	received := LD_RecvOne(LD_DiscoverySock, message, ip, port, fromAddr)
+	received := LD_RecvOne(wParam, message, ip, port, fromAddr)
 	if(received = -1)
 		return
 
 	if(InStr(message, "LIBREDECK_SERVER|") = 1)
 		LibreDeckDiscoveryAddOrUpdateServer(ip, message)
+}
+
+LibreDeckDiscoveryIsKnownSocket(sock)
+{
+	global LD_DiscoverySocks
+	for index, entry in LD_DiscoverySocks
+		if(entry.sock = sock)
+			return true
+	return false
+}
+
+LibreDeckDiscoverySendDiscover(message)
+{
+	global LD_DiscoverySocks, LD_DiscoveryInterfaces, DiscoveryInterfaceChoice, LD_DiscoveryPort, LD_DiscoveryBroadcastIP
+
+	sentCount := 0
+	if(DiscoveryInterfaceChoice = "All interfaces")
+	{
+		for index, entry in LD_DiscoverySocks
+		{
+			for label, selected in LD_DiscoveryInterfaces
+			{
+				if(selected.ip != entry.localIP)
+					continue
+				broadcast := LibreDeckDiscoveryCalculateBroadcast(selected.ip, selected.mask)
+				sent := LD_SendToIP(entry.sock, message, broadcast, LD_DiscoveryPort)
+				if(sent != -1)
+					sentCount++
+			}
+		}
+	}
+	else
+	{
+		sent := LD_SendToIP(LD_DiscoverySocks[1].sock, message, LD_DiscoveryBroadcastIP, LD_DiscoveryPort)
+		if(sent != -1)
+			sentCount := 1
+	}
+	return sentCount
 }
 
 LibreDeckDiscoveryAddOrUpdateServer(ip, message)
@@ -1991,6 +3101,7 @@ LibreDeckDiscoveryAddOrUpdateServer(ip, message)
 	FormatTime, now,, HH:mm:ss
 	key := ip ":" tcpPort ":" resourcePort
 	Gui, networkSettings:Default
+	Gui, ListView, NetworkDiscoveryServerList
 	if(LD_DiscoveryServers.HasKey(key))
 	{
 		row := LD_DiscoveryServers[key]
@@ -2004,7 +3115,7 @@ LibreDeckDiscoveryAddOrUpdateServer(ip, message)
 
 	count := LV_GetCount()
 	GuiControl, networkSettings:+cBlack, NetworkDiscoveryStatus
-	GuiControl, networkSettings:, NetworkDiscoveryStatus, Receiving... %count% server(s)
+	GuiControl, networkSettings:, NetworkDiscoveryStatus, % LD_T("network.discovery_receiving", "Receiving... {count} server(s)", {count: count})
 }
 
 NetworkDiscoveryFillConnectionForm(row)
@@ -2012,6 +3123,8 @@ NetworkDiscoveryFillConnectionForm(row)
 	global
 
 	Gui, networkSettings:Default
+	Gui, ListView, NetworkDiscoveryServerList
+	LV_GetText(selectedName, row, 1)
 	LV_GetText(selectedIP, row, 2)
 	LV_GetText(selectedPort, row, 3)
 	LV_GetText(selectedResourcePort, row, 4)
@@ -2024,6 +3137,11 @@ NetworkDiscoveryFillConnectionForm(row)
 	GuiControl, networkSettings:, PortTxt, %selectedPort%
 	if(selectedResourcePort != "" && selectedResourcePort != "?")
 		GuiControl, networkSettings:, ResourcesPortTxt, %selectedResourcePort%
+	LD_CurrentDiscoveredServerName := selectedName
+	nickname := LibreDeckProfileGetNickname(selectedIP, selectedPort, selectedResourcePort)
+	if(nickname = "")
+		nickname := selectedName
+	GuiControl, networkSettings:, NicknameTxt, %nickname%
 	return true
 }
 
@@ -2032,7 +3150,7 @@ LibreDeckDiscoveryBuildInterfaceList()
 	global LD_DiscoveryInterfaces
 
 	LD_DiscoveryInterfaces := {}
-	list := ""
+	list := "All interfaces||"
 
 	try wmi := ComObjGet("winmgmts:\\.\root\cimv2")
 	catch
@@ -2068,14 +3186,11 @@ LibreDeckDiscoveryBuildInterfaceList()
 			entry.description := description
 			LD_DiscoveryInterfaces[label] := entry
 
-			if(list = "")
-				list := label "||"
-			else
-				list .= label "|"
+			list .= label "|"
 		}
 	}
 
-	if(list = "")
+	if(list = "All interfaces||")
 		return "|"
 	return RTrim(list, "|")
 }
@@ -2109,7 +3224,219 @@ LibreDeckDiscoveryCalculateBroadcast(ip, mask)
 	return b1 "." b2 "." b3 "." b4
 }
 
+LibreDeckProfileKey(ip, port, resourcePort)
+{
+	return ip ":" port ":" resourcePort
+}
+
+LibreDeckProfileGetNickname(ip, port, resourcePort)
+{
+	global conf
+
+	if(!IsObject(conf) || !IsObject(conf.serverProfiles))
+		return ""
+	key := LibreDeckProfileKey(ip, port, resourcePort)
+	if(conf.serverProfiles.HasKey(key))
+		return conf.serverProfiles[key].nickname
+	return ""
+}
+
+LibreDeckProfileSaveSuccessfulConnection(ip, port, resourcePort, nickname := "", discoveredName := "")
+{
+	global conf
+
+	if(!IsObject(conf.serverProfiles))
+		conf.serverProfiles := {}
+	if(nickname = "")
+		nickname := discoveredName
+	if(nickname = "")
+		nickname := ip ":" port
+
+	FormatTime, now,, yyyy-MM-dd HH:mm:ss
+	key := LibreDeckProfileKey(ip, port, resourcePort)
+	profile := {}
+	profile.nickname := nickname
+	profile.name := discoveredName
+	profile.ip := ip
+	profile.port := port
+	profile.resourcesPort := resourcePort
+	profile.lastConnected := now
+	conf.serverProfiles[key] := profile
+	conf.lastServerProfile := key
+	if(conf.favoriteServerProfile = "")
+		conf.favoriteServerProfile := key
+	LibreDeckSaveConfig()
+}
+
+LibreDeckApplyStartupProfile()
+{
+	global conf
+
+	if(!IsObject(conf) || !IsObject(conf.serverProfiles) || !conf.online)
+		return false
+
+	key := ""
+	if(conf.favoriteServerProfile != "" && conf.serverProfiles.HasKey(conf.favoriteServerProfile))
+		key := conf.favoriteServerProfile
+	if(conf.lastServerProfile != "" && conf.serverProfiles.HasKey(conf.lastServerProfile)) ; Last profile has priority over favorite server
+		key := conf.lastServerProfile
+
+	if(key = "")
+		return false
+
+	profile := conf.serverProfiles[key]
+	conf.ip := profile.ip
+	conf.port := profile.port
+	conf.resourcesPort := profile.resourcesPort
+	return true
+}
+
+LibreDeckProfileLabel(key)
+{
+	global conf
+	label := ""
+	if(conf.favoriteServerProfile = key)
+		label := "*"
+	if(conf.lastServerProfile = key)
+		label .= "L"
+	return label
+}
+
+NetworkProfileGetSelectedRow()
+{
+	Gui, networkSettings:Default
+	Gui, ListView, NetworkProfileList
+	row := LV_GetNext()
+	if(!row)
+		MsgBox,,% LD_T("network.select_profile_first_title", "LibreDeck Profiles"), % LD_T("network.select_profile_first", "Select a saved profile first.")
+	return row
+}
+
+NetworkProfileGetKeyFromRow(row)
+{
+	Gui, networkSettings:Default
+	Gui, ListView, NetworkProfileList
+	LV_GetText(selectedIP, row, 3)
+	LV_GetText(selectedPort, row, 4)
+	LV_GetText(selectedResourcePort, row, 5)
+	if(selectedIP = "" || selectedPort = "")
+		return ""
+	return LibreDeckProfileKey(selectedIP, selectedPort, selectedResourcePort)
+}
+
+NetworkProfileRenameSelected(row)
+{
+	global conf
+	key := NetworkProfileGetKeyFromRow(row)
+	if(key = "" || !conf.serverProfiles.HasKey(key))
+		return
+	currentNickname := conf.serverProfiles[key].nickname
+	InputBox, newNickname, % LD_T("network.profile_nickname_title", "Profile Nickname"), % LD_T("network.profile_nickname_prompt", "Insert nickname for this LibreDeck server profile:"), , 420, 145,,,,,%currentNickname%
+	if(ErrorLevel)
+		return
+	newNickname := Trim(newNickname)
+	if(newNickname = "")
+		return
+	conf.serverProfiles[key].nickname := newNickname
+	LibreDeckSaveConfig()
+	LibreDeckProfilesRefreshList()
+	GuiControl, networkSettings:+cBlue, NetworkStatusInfo
+	GuiControl, networkSettings:Text, NetworkStatusInfo, % LD_T("network.status_profile_renamed", "Profile renamed")
+}
+
+NetworkProfileSetFavorite(row)
+{
+	global conf
+	key := NetworkProfileGetKeyFromRow(row)
+	if(key = "" || !conf.serverProfiles.HasKey(key))
+		return
+	conf.favoriteServerProfile := key
+	LibreDeckSaveConfig()
+	NetworkProfileFillConnectionForm(row)
+	LibreDeckProfilesRefreshList()
+	GuiControl, networkSettings:+cBlue, NetworkStatusInfo
+	GuiControl, networkSettings:Text, NetworkStatusInfo, % LD_T("network.status_favorite_selected", "Favorite profile selected")
+}
+
+NetworkProfileDeleteSelected(row)
+{
+	global conf
+	key := NetworkProfileGetKeyFromRow(row)
+	if(key = "" || !conf.serverProfiles.HasKey(key))
+		return
+	nickname := conf.serverProfiles[key].nickname
+	OnMessage(0x44, "OnMsgBox")
+	MsgBoxBtn1 = Delete
+	MsgBoxBtn2 = Cancel
+	MsgBox 0x34, % LD_T("network.delete_profile_title", "Delete Profile?"), % LD_T("network.delete_profile_prompt", "Delete saved profile ""{nickname}""?", {nickname: nickname})
+	OnMessage(0x44, "")
+	IfMsgBox No
+		return
+	conf.serverProfiles.Delete(key)
+	if(conf.favoriteServerProfile = key)
+		conf.favoriteServerProfile := ""
+	if(conf.lastServerProfile = key)
+		conf.lastServerProfile := ""
+	LibreDeckSaveConfig()
+	LibreDeckProfilesRefreshList()
+	GuiControl, networkSettings:+cBlue, NetworkStatusInfo
+	GuiControl, networkSettings:Text, NetworkStatusInfo, % LD_T("network.status_profile_deleted", "Profile deleted")
+}
+
+LibreDeckSaveConfig()
+{
+	global conf, JSON
+	FileDelete, ./conf/config.json
+	FileAppend, % JSON.Dump(conf, 1), ./conf/config.json
+}
+
+LibreDeckProfilesRefreshList()
+{
+	global conf
+
+	if(!WinExist("LibreDeck Network Settings"))
+		return
+
+	Gui, networkSettings:Default
+	Gui, ListView, NetworkProfileList
+	LV_Delete()
+	if(!IsObject(conf.serverProfiles))
+		return
+
+	for key, profile in conf.serverProfiles
+		LV_Add("", LibreDeckProfileLabel(key), profile.nickname, profile.ip, profile.port, profile.resourcesPort, profile.lastConnected)
+}
+
+NetworkProfileFillConnectionForm(row)
+{
+	global LD_CurrentDiscoveredServerName
+
+	Gui, networkSettings:Default
+	Gui, ListView, NetworkProfileList
+	LV_GetText(nickname, row, 2)
+	LV_GetText(selectedIP, row, 3)
+	LV_GetText(selectedPort, row, 4)
+	LV_GetText(selectedResourcePort, row, 5)
+	if(selectedIP = "" || selectedPort = "")
+		return false
+
+	LD_CurrentDiscoveredServerName := ""
+	GuiControl, networkSettings:, OnlineChk, 1
+	GuiControl, networkSettings:, IpTxt, %selectedIP%
+	GuiControl, networkSettings:, PortTxt, %selectedPort%
+	GuiControl, networkSettings:, ResourcesPortTxt, %selectedResourcePort%
+	GuiControl, networkSettings:, NicknameTxt, %nickname%
+	return true
+}
+
 setWifiIcon:
+	RefreshWifiIcon()
+return
+
+RefreshWifiIcon()
+{
+	global conf, serverFound, btnPics
+
 	Gui, 1:Default
 	if(conf.online)
 	{
@@ -2126,7 +3453,7 @@ setWifiIcon:
 	{
 		GuiControl, , wifi_icon, % btnPics["wifi_icon_disabled.png"] ? "HBITMAP:*" btnPics["wifi_icon_disabled.png"] : ""
 	}
-return
+}
 
 downloadServerProfile:
 	if(!FileExist(A_ScriptDir "\resources\img\" conf.ip)) ; Nuevo servidor
@@ -2141,10 +3468,10 @@ downloadServerProfile:
 	}
 	else
 	{
-		server_config := ParseJson(URLToVar("http://" conf.ip ":" conf.resourcesPort "/resourcePack_info.txt"))
+		server_config := JSON.Load(URLToVar("http://" conf.ip ":" conf.resourcesPort "/resourcePack_info.txt"))
 		serverMD5 := server_config.resourcePackMD5
 		FileRead, localMD5, % "./resources/img/" conf.ip "/resourcePack_info.txt"
-		localMD5 := ParseJson(localMD5).resourcePackMD5
+		localMD5 := JSON.Load(localMD5).resourcePackMD5
 		if(serverMD5 != localMD5) ; Reemplazo local pq ha cambiado el MD5
 		{
 			MsgBox 0x4, Download Server Resource Pack?, Do you want to try to download the server's Resource Pack?
@@ -2171,7 +3498,7 @@ return
 ; WM_COPYDATA specific funtions
 setBackground:
 	try {
-		incomingBackgroundChange := ParseJson(incomingBackgroundChange)
+		incomingBackgroundChange := JSON.Load(incomingBackgroundChange)
 
 		hasFolder := incomingBackgroundChange.HasKey("folderName") && incomingBackgroundChange.folderName != ""
 
@@ -2198,7 +3525,7 @@ return
 
 setButtonIconRemote:
 	try {
-		incomingButtonChange := ParseJson(incomingButtonChange)
+		incomingButtonChange := JSON.Load(incomingButtonChange)
 
 		hasFolder := incomingButtonChange.HasKey("folderName") && incomingButtonChange.folderName != ""
 		hasPage := incomingButtonChange.HasKey("page") && incomingButtonChange.page != ""
@@ -2247,7 +3574,7 @@ setButtonIcon(buttonId, imagePathOrName) {
 ; Notification examples at: plugins: notification_examples.ahk & backup_libredeck.ahk
 showIncomingNotification:
 	try {
-		incomingNotification := ParseJson(incomingNotification)
+		incomingNotification := JSON.Load(incomingNotification)
 		if (incomingNotification.region == "top") {
 			setNotificationTop(incomingNotification.text, incomingNotification.duration)
 		} else if (incomingNotification.region == "bottom") {
@@ -2288,7 +3615,7 @@ return
 
 remotePageChange:
 	try {
-		incomingPageChange := ParseJson(incomingPageChange)
+		incomingPageChange := JSON.Load(incomingPageChange)
 		if (incomingPageChange.isFolder) {
 			CarpetaBoton := incomingPageChange.folderName
 			global PaginaCarpeta := incomingPageChange.pageNumber
@@ -2349,11 +3676,11 @@ changeReactiveSetting:
 	gosub, guardarConfig
 	if(conf.reactiveWindow)
 	{
-		Menu ContextMenuGenerico, Check, Reactive Pages
+		Menu ContextMenuGenerico, Check, % LD_T("app_menu.reactive_pages", "Reactive Pages")
 	}
 	else
 	{
-		Menu ContextMenuGenerico, UnCheck, Reactive Pages
+		Menu ContextMenuGenerico, UnCheck, % LD_T("app_menu.reactive_pages", "Reactive Pages")
 	}
 	gosub, setReactiveService
 return
@@ -2392,12 +3719,12 @@ lookForUpdatesOnBootLabel:
 	if(conf.lookForUpdates)
 	{
 		conf.lookForUpdates := 0
-		Menu LookForUpdatesMenu, UnCheck, On Boot
+		Menu LookForUpdatesMenu, UnCheck, % LD_T("tray.updates_on_boot", "On Boot")
 	}
 	else
 	{
 		conf.lookForUpdates := 1
-		Menu LookForUpdatesMenu, Check, On Boot
+		Menu LookForUpdatesMenu, Check, % LD_T("tray.updates_on_boot", "On Boot")
 	}
 	gosub, guardarConfig
 return
@@ -2480,7 +3807,7 @@ bindFolderToProgramClose:
 return
 
 showAboutScreen:
-	showAboutScreen("LibreDeck v" ClientVersionNumber, "A multi-purpose macro pannel tailored to be used both in single screen setups, multi screen, touch support and multi machine setups via sockets.")
+	showAboutScreen("LibreDeck v" ClientVersionNumber, LD_T("about.description", "A multi-purpose macro pannel tailored to be used both in single screen setups, multi screen, touch support and multi machine setups via sockets."))
 return
 
 openLibreDeckFolder:
@@ -2489,11 +3816,82 @@ return
 
 loadConfig:
 	FileRead, conf, ./conf/config.json
-	global conf := ParseJson(conf)
+	global conf := JSON.Load(conf)
+	if(!IsObject(conf.serverProfiles))
+		conf.serverProfiles := {}
+	if(conf.favoriteServerProfile = "")
+		conf.favoriteServerProfile := ""
+	if(conf.lastServerProfile = "")
+		conf.lastServerProfile := ""
+	if(conf.language = "")
+		conf.language := "en_US"
 	scriptEditorPath := conf.scriptEditorPath
 	StringReplace, scriptEditorPath, scriptEditorPath, \, \\, All
 	conf.scriptEditorPath := scriptEditorPath
 return
+
+LD_InitI18n()
+{
+	global conf, LD_i18n
+
+	locale := conf.language
+	if(locale = "")
+		locale := "en_US"
+	LD_i18n := new i18n(A_ScriptDir "\i18n", locale, ["en_US"])
+	try LD_i18n.LoadDir(A_ScriptDir "\i18n")
+	catch e
+		LD_i18n := ""
+}
+
+LD_T(key, default := "", params := "")
+{
+	global LD_i18n
+
+	if(IsObject(LD_i18n))
+		return LD_i18n.t(key, params, default)
+	if(default != "")
+		return default
+	return key
+}
+
+LD_BuildLanguageMenu()
+{
+	global LD_i18n, conf
+
+	try Menu, LanguageMenu, DeleteAll
+	count := 0
+	if(IsObject(LD_i18n))
+	{
+		for code, _ in LD_i18n.locales
+		{
+			Menu, LanguageMenu, Add, %code%, ChangeLanguageFromTray
+			count++
+		}
+	}
+	if(count = 0)
+	{
+		Menu, LanguageMenu, Add, en_US, ChangeLanguageFromTray
+		Menu, LanguageMenu, Add, es_ES, ChangeLanguageFromTray
+	}
+	LD_UpdateLanguageMenuChecks()
+}
+
+LD_UpdateLanguageMenuChecks()
+{
+	global LD_i18n, conf
+
+	if(IsObject(LD_i18n))
+	{
+		for code, _ in LD_i18n.locales
+			try Menu, LanguageMenu, UnCheck, %code%
+	}
+	else
+	{
+		try Menu, LanguageMenu, UnCheck, en_US
+		try Menu, LanguageMenu, UnCheck, es_ES
+	}
+	try Menu, LanguageMenu, Check, % conf.language
+}
 
 reloadPlugins:
 	for key, plugin in plugins

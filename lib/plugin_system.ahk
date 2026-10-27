@@ -38,7 +38,7 @@ BuildSubmenu_(menuDef, scriptGeneratorChild := false) {
     {
         type := item.type
         if (type = "command") {
-            labelText := item.label
+            labelText := TranslatePluginMenuLabel_(item.label)
             handler   := item.handler
             if (!labelText) {
                 MsgBox, 16, Error, Missing "label" in an item from %menuName%.
@@ -59,7 +59,7 @@ BuildSubmenu_(menuDef, scriptGeneratorChild := false) {
         else if (type = "submenu") {
             if IsObject(item.submenu) {
                 BuildSubmenu_(item.submenu, wrapScriptGeneratorCommands)
-                labelText := item.label ? item.label : item.submenu.name
+                labelText := TranslatePluginMenuLabel_(item.label ? item.label : item.submenu.name)
                 if (labelText) {
                     Menu, %menuName%, Add, %labelText%, % ":" item.submenu.name
                     iconPath := item.icon ? item.icon : item.submenu.icon_default
@@ -76,7 +76,7 @@ BuildSubmenu_(menuDef, scriptGeneratorChild := false) {
 
 RegisterSubmenu_(reg) {
     parentMenu := reg.menu
-    showLabel  := reg.label
+    showLabel  := TranslatePluginMenuLabel_(reg.label)
     subName    := reg.submenu
     if (!parentMenu || !showLabel || !subName) {
         MsgBox, 16, Error, register_in mal formado. Se requiere "menu", "label" y "submenu".
@@ -85,6 +85,27 @@ RegisterSubmenu_(reg) {
 
     Menu, %parentMenu%, Add, %showLabel%, :%subName%
     ApplyIcon(parentMenu, showLabel, reg.icon)
+}
+
+TranslatePluginMenuLabel_(label)
+{
+    key := PluginMenuTranslationKey_(label)
+    try
+        return LD_T(key, label)
+    catch
+        return label
+}
+
+PluginMenuTranslationKey_(label)
+{
+    if (label = "Volume +")
+        return "script_gen.volume_plus"
+    if (label = "Volume -")
+        return "script_gen.volume_minus"
+    StringLower, key, label
+    key := RegExReplace(key, "[^a-z0-9]+", "_")
+    key := Trim(key, "_")
+    return "script_gen." key
 }
 
 ApplyIcon(menuName, itemLabel, iconDef) {

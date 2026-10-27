@@ -25,28 +25,83 @@
     if (k="size")
       return this.msgSize()
   }
-  connect(host, port)
+  connect(host, port, timeoutMs="")
   {
-    if ((this.socket!=-1) || (!(faddr := next := this.__getAddrInfo(host, port))))
+    if (this.socket!=-1)
       return 0
+    if (!(faddr := next := this.__getAddrInfo(host, port)))
+    {
+      this.errorNM := "Could not connect to the server " host ":" port " - Enabling Offline Mode"
+      return 0
+    }
     while (next)
     {
       sockaddrlen := NumGet(next+0, 16, "uint")
       sockaddr := NumGet(next+0, 16+(2*A_PtrSize), "ptr")
       if ((this.socket := DllCall("ws2_32\socket", "int", NumGet(next+0, 4, "int"), "int", this.__socketType, "int", this.__protocolId, "ptr"))!=-1)
       {
-        if ((r := DllCall("ws2_32\WSAConnect", "ptr", this.socket, "ptr", sockaddr, "uint", sockaddrlen, "ptr", 0, "ptr", 0, "ptr", 0, "ptr", 0, "int"))=0)
+        this.errorNM := ""
+        if ((timeoutMs != "" && this.__connectWithTimeout(sockaddr, sockaddrlen, timeoutMs)) || (timeoutMs = "" && (r := DllCall("ws2_32\WSAConnect", "ptr", this.socket, "ptr", sockaddr, "uint", sockaddrlen, "ptr", 0, "ptr", 0, "ptr", 0, "ptr", 0, "int"))=0))
         {
+          this.errorNM := ""
           DllCall("ws2_32\freeaddrinfo", "ptr", faddr)
           return Socket.__eventProcRegister(this, 0x21)
         }
-        this.errorNM := "Could not connect to the server " host ":" port " - Enabling Offline Mode"
+        if(this.errorNM = "")
+          this.errorNM := "Could not connect to the server " host ":" port " - Enabling Offline Mode"
         this.disconnect()
       }
       next := NumGet(next+0, 16+(3*A_PtrSize), "ptr")
     }
     this.lastError := DllCall("ws2_32\WSAGetLastError")
     return 0
+  }
+  __connectWithTimeout(sockaddr, sockaddrlen, timeoutMs)
+  {
+    VarSetCapacity(nonblocking, 4, 0)
+    NumPut(1, nonblocking, 0, "uint")
+    DllCall("ws2_32\ioctlsocket", "ptr", this.socket, "uint", 0x8004667E, "ptr", &nonblocking)
+    if (DllCall("ws2_32\WSAConnect", "ptr", this.socket, "ptr", sockaddr, "uint", sockaddrlen, "ptr", 0, "ptr", 0, "ptr", 0, "ptr", 0, "int")=0)
+      return 1
+    lastError := DllCall("ws2_32\WSAGetLastError")
+    if (lastError != 10035 && lastError != 10036)
+    {
+      this.lastError := lastError
+      return 0
+    }
+
+    fdOffset := (A_PtrSize=8) ? 8 : 4
+    VarSetCapacity(writefds, fdOffset + A_PtrSize, 0)
+    VarSetCapacity(exceptfds, fdOffset + A_PtrSize, 0)
+    NumPut(1, writefds, 0, "uint")
+    NumPut(this.socket, writefds, fdOffset, "ptr")
+    NumPut(1, exceptfds, 0, "uint")
+    NumPut(this.socket, exceptfds, fdOffset, "ptr")
+    VarSetCapacity(timeout, 8, 0)
+    NumPut(Floor(timeoutMs / 1000), timeout, 0, "long")
+    NumPut(Mod(timeoutMs, 1000) * 1000, timeout, 4, "long")
+    ready := DllCall("ws2_32\select", "int", 0, "ptr", 0, "ptr", &writefds, "ptr", &exceptfds, "ptr", &timeout, "int")
+    if(ready <= 0)
+    {
+      this.lastError := (ready = 0) ? 10060 : DllCall("ws2_32\WSAGetLastError")
+      this.errorNM := "Connection timed out"
+      return 0
+    }
+
+    VarSetCapacity(sockError, 4, 0)
+    optLen := 4
+    if(DllCall("ws2_32\getsockopt", "ptr", this.socket, "int", 0xFFFF, "int", 0x1007, "ptr", &sockError, "int*", optLen, "int") != 0)
+    {
+      this.lastError := DllCall("ws2_32\WSAGetLastError")
+      return 0
+    }
+    sockError := NumGet(sockError, 0, "int")
+    if(sockError != 0)
+    {
+      this.lastError := sockError
+      return 0
+    }
+    return 1
   }
   bind(host, port)
   {

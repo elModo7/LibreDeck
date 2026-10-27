@@ -1,5 +1,9 @@
 #NoEnv
 #SingleInstance,Force
+#Include lib\cJSON.ahk
+#Include lib\i18n.ahk
+#Include lib\script_generator\i18n_helper.ahk
+LD_SG_InitI18n()
 global WindowsKey, Edt1, Edt2
 global buttonPath = %0%
 if(SubStr(buttonPath, -3) != ".ahk")
@@ -8,6 +12,7 @@ SplitPath, buttonPath,, buttonDir
 if(buttonDir != "")
 	FileCreateDir, %buttonDir%
 global delay
+global LD_SG_NoKeyText := LD_SG_T("script_gen_window.hotkey.none", "None")
 SkinForm(Apply, A_ScriptDir . "\lib\them.dll", A_ScriptDir . "\lib\tm")
 OnExit, GetOut
 WindowsKey := 0
@@ -16,19 +21,19 @@ Gui, +hwndHw
 Gui, Color, , 44444444
 Gui, Font, s14 cffff00 TAhoma
 Gui,Add,Hotkey, W280 x-990 y6 vEdt1 gEdt1 hwndHedt1
-Gui,Add,Edit, x10 y6 w350 gEdt2 vEdt2 hwndHedt2 Background00ffff, None
+Gui,Add,Edit, x10 y6 w350 gEdt2 vEdt2 hwndHedt2 Background00ffff, %LD_SG_NoKeyText%
 Gui, Font, s10 c000000 TAhoma
 Gui Font, Bold
-Gui Add, CheckBox, x16 y48 w190 h23 gWindowsKey vWindowsKey, Windows Key Pressed
-Gui Add, Button, x260 y104 w95 h30 gCreate, APPLY
-Gui Add, Text, x16 y80 w90 h23 +0x200, Custom Key:
+Gui Add, CheckBox, x16 y48 w190 h23 gWindowsKey vWindowsKey, % LD_SG_T("script_gen_window.hotkey.windows_key", "Windows Key Pressed")
+Gui Add, Button, x260 y104 w95 h30 gCreate, % LD_SG_T("script_gen_window.apply", "APPLY")
+Gui Add, Text, x16 y80 w90 h23 +0x200, % LD_SG_T("script_gen_window.hotkey.custom_key", "Custom Key:")
 Gui, Font, s10 cffff00 TAhoma
 Gui Add, Edit, vcustomKey gcustomKey x110 y80 w120 h21 ; Custom Key
 Gui, Font, s10 c000000 TAhoma
-Gui Add, Text, x16 y112 w70 h23 +0x200, Delay (s):
+Gui Add, Text, x16 y112 w70 h23 +0x200, % LD_SG_T("script_gen_window.hotkey.delay", "Delay (s):")
 Gui, Font, s10 cffff00 TAhoma
 Gui Add, Edit, vdelay x90 y112 w47 h21 +Number ; Delay
-Gui,Show, w370 h142, Generate Macro
+Gui,Show, w370 h142, % LD_SG_T("script_gen_window.hotkey.title", "Generate Macro")
 
 GuiControl, Focus, Edt1
 ;~ OnMessage(0x133, "Focus_Hk") ; Auto Focus Hotkey Field
@@ -64,7 +69,7 @@ Edt1:
     Ehk:=StrReplace(Ehk, "`+", "Shift + "), Ehk:=StrReplace(Ehk, "`!", "Alt + "), Ehk:=StrReplace(Ehk, "`^", "Ctrl + ")
     if Ehk
         GuiControl,, Edt2, % Ehk
-    else GuiControl,, Edt2, None
+    else GuiControl,, Edt2, %LD_SG_NoKeyText%
 Return
 
 WindowsKey:
@@ -75,7 +80,7 @@ Create:
     if FileExist(buttonPath)
 	{
 		OnMessage(0x44, "OnMsgBox")
-		MsgBox 0x34, Overwrite?, This button already has a macro file`, do you want to overwrite it?`n`nPrevious function will be lost!
+		MsgBox 0x34, % LD_SG_T("script_gen_window.overwrite_title", "Overwrite?"), % LD_SG_T("script_gen_window.overwrite_prompt", "This button already has a macro file`, do you want to overwrite it?`n`nPrevious function will be lost!")
 		OnMessage(0x44, "")
 
 		IfMsgBox Yes, {
@@ -243,3 +248,12 @@ GetOut:
 GuiClose:
     SkinForm(0)
 	ExitApp
+
+OnMsgBox() {
+    DetectHiddenWindows, On
+    Process, Exist
+    If (WinExist("ahk_class #32770 ahk_pid " . ErrorLevel)) {
+        ControlSetText Button1, % LD_SG_T("script_gen_window.overwrite_button", "Overwrite")
+        ControlSetText Button2, % LD_SG_T("script_gen_window.cancel_button", "CANCEL")
+    }
+}

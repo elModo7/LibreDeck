@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Server
 ;@Ahk2Exe-SetDescription Macro Panel Server
-;@Ahk2Exe-SetVersion 0.6.0
+;@Ahk2Exe-SetVersion 0.6.1
 ;@Ahk2Exe-SetCopyright 2026`, elModo7
 ;@Ahk2Exe-SetOrigFilename LibreDeck Server.exe
 ; INITIALIZE
@@ -11,7 +11,7 @@
 SetBatchLines, -1
 #NoEnv
 #Persistent
-global versionNumber := "0.6.0"
+global versionNumber := "0.6.1"
 global clientVersion := versionNumber " - elModo7 / VictorDevLog " A_YYYY
 global LD_ServerDiscoverySock := -1
 global LD_ServerDiscoverySocketCallback := ""
@@ -20,7 +20,8 @@ global LD_SERVER_DISCOVERY_SOCKET_MSG := 0x9988
 global LD_SERVER_DISCOVERY_FD_READ := 1
 #Include <Socket>
 #Include <LibreDeckDiscovery>
-#Include <JSON>
+;~ #Include <JSON> ; Deprecated in 0.6.1
+#Include <cJSON>
 #Include <MD5>
 #Include <SplashScreen>
 #Include <aboutScreen>
@@ -40,7 +41,7 @@ if(!FileExist("./conf/server_config.json"))
 	gosub, guardarConfig
 }
 FileRead, conf, ./conf/server_config.json
-global conf := ParseJson(conf)
+global conf := JSON.Load(conf)
 gosub, guardarConfigShared
 contextcolor() ; Dark Theme
 
@@ -112,17 +113,17 @@ return
 
 guardarConfig:
 	FileDelete, ./conf/server_config.json
-	FileAppend, % JSON_Beautify(BuildJson(conf)), ./conf/server_config.json
+	FileAppend, % JSON.Dump(conf, 1), ./conf/server_config.json
 return
 
 guardarConfigShared:
 	FileRead, shared_conf, ./resources/shared/resourcePack_info.txt
 	FileRead, client_conf, ./conf/config.json
-	client_conf := ParseJson(client_conf)
-	shared_conf := ParseJson(shared_conf)
+	client_conf := JSON.Load(client_conf)
+	shared_conf := JSON.Load(shared_conf)
 	shared_conf.folderButtons := client_conf.folderButtons
 	FileDelete, ./resources/shared/resourcePack_info.txt
-	FileAppend, % JSON_Beautify(BuildJson(shared_conf)), ./resources/shared/resourcePack_info.txt
+	FileAppend, % JSON.Dump(shared_conf, 1), ./resources/shared/resourcePack_info.txt
 return
 
 OnExit, Exit
@@ -137,8 +138,8 @@ Return
 
 OnTCPRecvServer(this)
 {
-    global Client
-    data := ParseJson(this.RecvText())
+    global Client, JSON
+    data := JSON.Load(this.RecvText())
     try
     {
         Client.sendText(data.BotonVisual)

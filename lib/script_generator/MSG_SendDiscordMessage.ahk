@@ -1,4 +1,4 @@
-﻿;~ ; The idea is to have a list of webhooks name => wh to select from in the config
+;~ ; The idea is to have a list of webhooks name => wh to select from in the config
 #NoEnv
 #SingleInstance Force
 SetBatchLines -1

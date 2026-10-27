@@ -3,11 +3,13 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,6 +44,9 @@ func main() {
 
 	// Ruta al autohotkey (puede ser el builtin del proyecto)
 	ahkExe := getenv("AHK_EXE", `.\lib\autohotkey.exe`)
+	sevenZipExe := getenv("SEVENZIP_EXE", `.\lib\7za.exe`)
+	imagesDir := getenv("IMAGE_DIR", "./resources/img")
+	sharedDir := getenv("RESOURCE_DIR", "./resources/shared")
 
 	absButtons, err := filepath.Abs(buttonsDir)
 	if err != nil {
@@ -58,11 +63,15 @@ func main() {
 	log.Printf("Servidor TCP escuchando en %s", addr)
 	log.Printf("Botones: %s", absButtons)
 	log.Printf("AutoHotkey: %s", ahkExe)
+	if err := rebuildResourcePack(sharedDir, imagesDir, "./conf/config.json", sevenZipExe); err != nil {
+		log.Printf("No se pudo regenerar el resource pack: %v", err)
+	}
 	if err := startDiscoveryServer(discoveryPort, serverName, advertisedTCPPort, resourcePort); err != nil {
 		log.Printf("Discovery UDP desactivado: %v", err)
 	} else {
 		log.Printf("Discovery UDP escuchando en 0.0.0.0:%s como %q", discoveryPort, serverName)
 	}
+	startResourceServer(resourcePort)
 
 	for {
 		conn, err := ln.Accept()
@@ -106,6 +115,105 @@ func startDiscoveryServer(discoveryPort, serverName, tcpPort, resourcePort strin
 	return nil
 }
 
+func startResourceServer(resourcePort string) {
+	sharedDir := getenv("RESOURCE_DIR", "./resources/shared")
+	absShared, err := filepath.Abs(sharedDir)
+	if err != nil {
+		log.Printf("Resource server desactivado: RESOURCE_DIR inválido: %v", err)
+		return
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/resourcePack.7z", serveSharedFile(absShared, "resourcePack.7z"))
+	mux.HandleFunc("/resourcePack_info.txt", serveSharedFile(absShared, "resourcePack_info.txt"))
+
+	go func() {
+		addr := ":" + resourcePort
+		log.Printf("Resource pack HTTP escuchando en 0.0.0.0%s (%s)", addr, absShared)
+		if err := http.ListenAndServe(addr, mux); err != nil {
+			log.Printf("Resource server error: %v", err)
+		}
+	}()
+}
+
+func rebuildResourcePack(sharedDir, imagesDir, configPath, sevenZipExe string) error {
+	absShared, err := filepath.Abs(sharedDir)
+	if err != nil {
+		return err
+	}
+	absImages, err := filepath.Abs(imagesDir)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(absShared, 0755); err != nil {
+		return err
+	}
+
+	packPath := filepath.Join(absShared, "resourcePack.7z")
+	_ = os.Remove(packPath)
+	cmd := exec.Command(sevenZipExe, "a", packPath, "-m0=LZMA2", "-mx=9", "-mmt=on", "-aoa", "-mfb=64", filepath.Join(absImages, "*.png"))
+	cmd.Dir = "."
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	hash, size, err := fileMD5AndSize(packPath)
+	if err != nil {
+		return err
+	}
+	folderButtons, _ := readFolderButtons(configPath)
+	info := map[string]any{
+		"totalResourceSize": size,
+		"resourcePackMD5":   hash,
+		"folderButtons":     folderButtons,
+	}
+	data, err := json.MarshalIndent(info, "", "\t")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(absShared, "resourcePack_info.txt"), data, 0644)
+}
+
+func fileMD5AndSize(path string) (string, int64, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", 0, err
+	}
+	defer f.Close()
+	h := md5.New()
+	size, err := io.Copy(h, f)
+	if err != nil {
+		return "", 0, err
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), size, nil
+}
+
+func readFolderButtons(configPath string) (any, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return map[string]string{}, err
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return map[string]string{}, err
+	}
+	folderButtons, ok := cfg["folderButtons"]
+	if !ok {
+		return map[string]string{}, nil
+	}
+	return folderButtons, nil
+}
+
+func serveSharedFile(sharedDir, fileName string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		http.ServeFile(w, r, filepath.Join(sharedDir, fileName))
+	}
+}
+
 func handleConn(conn net.Conn, buttonsDir, ahkExe string) {
 	defer conn.Close()
 
@@ -113,7 +221,7 @@ func handleConn(conn net.Conn, buttonsDir, ahkExe string) {
 	// _ = conn.SetDeadline(time.Now().Add(30 * time.Minute))
 	// Usa solo ReadDeadline “deslizante” o ninguno.
 
-	_, _ = conn.Write([]byte("LibreDeck Server\n"))
+	_, _ = conn.Write([]byte("LibreDeck Server"))
 
 	r := bufio.NewReaderSize(conn, 64*1024)
 
@@ -138,25 +246,31 @@ func handleConn(conn net.Conn, buttonsDir, ahkExe string) {
 
 				var req Request
 				if err := json.Unmarshal(frame, &req); err != nil {
+					log.Printf("json inválido desde %s: %v", conn.RemoteAddr(), err)
 					continue
 				}
 
 				// (Opcional) pequeño delay antes de responder
 				time.Sleep(100 * time.Millisecond)
 
-				// Responde SOLO con BotonVisual (como tu server AHK)
+				// Responde SOLO con BotonVisual, igual que el servidor AHK.
 				if strings.TrimSpace(req.BotonVisual) != "" {
-					_, _ = conn.Write([]byte(req.BotonVisual + "\n"))
+					_, _ = conn.Write([]byte(req.BotonVisual))
 				}
 
 				target, err := resolveLocalButton(buttonsDir, req.FicheroEjecutar)
 				if err != nil {
+					log.Printf("botón no ejecutado (%s): %v", req.FicheroEjecutar, err)
 					continue
 				}
 
 				cmd := exec.Command(ahkExe, target)
 				cmd.Dir = filepath.Dir(buttonsDir)
-				_ = cmd.Start()
+				if err := cmd.Start(); err != nil {
+					log.Printf("error lanzando %s con %s: %v", target, ahkExe, err)
+					continue
+				}
+				log.Printf("botón ejecutado: %s", target)
 			}
 		}
 

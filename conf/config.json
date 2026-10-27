@@ -1,30 +1,36 @@
-{
-	"builtin_ahk":1,
-	"cargaProgresivaIconos":0,
-	"currentProfile":"localprofile",
-	"enviarAltTabAlPulsarBoton":1,
-	"extension":"ahk",
-	"folderButtons":{
-		"1":"App",
-		"2":"Folders",
-		"14":"OBS"
+﻿{
+	"builtin_ahk": 1,
+	"cargaProgresivaIconos": 0,
+	"currentProfile": "localprofile",
+	"enviarAltTabAlPulsarBoton": 1,
+	"extension": "ahk",
+	"favoriteServerProfile": "",
+	"folderButtons": {
+		"1": "App",
+		"2": "Folders",
+		"14": "OBS"
 	},
-	"ip":"127.0.0.1",
-	"isGolangServer":0,
-	"lookForUpdates":0,
-	"miniClient":1,
-	"moverRatonAlPulsarBoton":0,
-	"online":0,
-	"pantalla_Mitad_X":960,
-	"pantalla_Mitad_Y":540,
-	"port":7778,
-	"programFolder":{
-		"obs64.exe":"obs"
+	"ip": "127.0.0.1",
+	"isGolangServer": 0,
+	"language": "en_US",
+	"lastServerProfile": "",
+	"lookForUpdates": 0,
+	"miniClient": 1,
+	"moverRatonAlPulsarBoton": 0,
+	"online": 0,
+	"pantalla_Mitad_X": 960,
+	"pantalla_Mitad_Y": 540,
+	"port": 7778,
+	"programFolder": {
+		"obs64.exe": "obs"
 	},
-	"reactiveWindow":0,
-	"resourcesPort":7779,
-	"scriptEditorPath":"C:\\Windows\\System32\\notepad.exe",
-	"siempreVisible":1,
-	"x_Inicial":200,
-	"y_Inicial":200
+	"reactiveWindow": 0,
+	"resourcesPort": 7779,
+	"scriptEditorPath": "C:\\\\Windows\\\\System32\\\\notepad.exe",
+	"serverProfiles": {
+
+	},
+	"siempreVisible": 1,
+	"x_Inicial": 200,
+	"y_Inicial": 200
 }
