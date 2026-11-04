@@ -19,7 +19,7 @@ Right click on ***"LibreDeck Client.ahk"***, click **Compile Script**.
 A file named ***"LibreDeck Client.exe"*** will apear, run that file. Done!
 
 > [!IMPORTANT]  
-> Must be compiled with AutoHotkey v1 Unicode 32 bits. If unsure, right click on ***"LibreDeck Client.ahk"*** and click **Compile Script (GUI)** make sure "Base File" is set to U32 AutoHotkey.
+> ~~Must be compiled~~ It is recommended to compile it with AutoHotkey v1 (v1 is mandatory) Unicode 32 bits. If unsure, right click on ***"LibreDeck Client.ahk"*** and click **Compile Script (GUI)** make sure "Base File" is set to U32 AutoHotkey.
 
 # **Features:**
 
