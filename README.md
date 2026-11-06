@@ -77,10 +77,18 @@ A file named ***"LibreDeck Client.exe"*** will apear, run that file. Done!
 **Requires:**
 
 - Windows 10 (Previous versions work on win7)
-- AutoHotkey 1.37.02 U32
+- AutoHotkey v1 1.37.02 (recommended U32)
 
 # Pictures & Videos:
 
-<p align="center" width="100%">
-<video src="https://github.com/user-attachments/assets/df9e0e56-9599-4b89-8996-6c2bf91b1275" width="80%" controls></video>
-</p>
+
+<a href="https://www.reddit.com/r/esp32/s/ZCWSWrWsgH" target="_blank" rel="noopener noreferrer">
+  <img
+    width="303"
+    height="329"
+    alt="LibreDeck on an ESP32 circular AMOLED display"
+    src="https://github.com/user-attachments/assets/aa6f227d-a9bf-4239-9e95-ab2e081f564e"
+  />
+</a>
+
+
