@@ -2,7 +2,7 @@
 ; Recommended AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 4.4.1
+;@Ahk2Exe-SetVersion 4.4.2
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -62,7 +62,7 @@ FileEncoding, UTF-8
 #Include <plugin_system>
 #Include <LibreDeckButtonImage>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "4.4.1"
+global ClientVersionNumber := "4.4.2"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -525,7 +525,16 @@ NotImplemented:
 return
 
 ScriptGeneratorMenuCommand:
-	ScriptGeneratorPregenerarImagenBoton(BotonActivo, A_ThisMenuItem)
+	if(FileExist(A_ScriptDir "\resources\img\" BotonActivo ".png")) {
+		MsgBox 0x33, Replace button image?, This button already has an image`, do you want to replace it with the default one for this macro?
+		IfMsgBox Yes, {
+			ScriptGeneratorPregenerarImagenBoton(BotonActivo, A_ThisMenuItem)
+		} Else IfMsgBox Cancel, {
+			return
+		}
+	} else {
+		ScriptGeneratorPregenerarImagenBoton(BotonActivo, A_ThisMenuItem)
+	}
 	handler := LD_ScriptGeneratorMenuHandlers[A_ThisMenu "|" A_ThisMenuItem]
 	if(handler != "")
 		Gosub, %handler%
@@ -2126,7 +2135,7 @@ EditarScriptBoton(IdBoton)
 		EnsureButtonScriptDirectory(RutaScript)
 		FileAppend,,%RutaScript%
 	}
-	Run, % conf.scriptEditorPath " " RutaScript
+	Run, % """" conf.scriptEditorPath """ """ A_ScriptDir "\" RutaScript """"
 }
 
 CambiarRutaEditor:
@@ -2136,7 +2145,6 @@ CambiarRutaEditor:
 		MsgBox, No executable selected!
 	else
 	{
-		StringReplace, RutaEditorScripts, RutaEditorScripts, \, \\, All
 		conf.scriptEditorPath := RutaEditorScripts
 	}
 	; Extension Scripts
@@ -3825,10 +3833,21 @@ loadConfig:
 		conf.lastServerProfile := ""
 	if(conf.language = "")
 		conf.language := "en_US"
-	scriptEditorPath := conf.scriptEditorPath
-	StringReplace, scriptEditorPath, scriptEditorPath, \, \\, All
-	conf.scriptEditorPath := scriptEditorPath
+	editorPath := LD_NormalizeEditorPath(conf.scriptEditorPath)
+	if(editorPath != conf.scriptEditorPath)
+	{
+		conf.scriptEditorPath := editorPath
+		gosub, guardarConfigCambioOnline
+	}
 return
+
+LD_NormalizeEditorPath(path)
+{
+	; Repair accumulated escaping while preserving the UNC prefix.
+	isUNC := (SubStr(path, 1, 2) = "\\")
+	path := RegExReplace(path, "\\{2,}", "\")
+	return isUNC ? "\" path : path
+}
 
 LD_InitI18n()
 {

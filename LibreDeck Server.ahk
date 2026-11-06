@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Server
 ;@Ahk2Exe-SetDescription Macro Panel Server
-;@Ahk2Exe-SetVersion 0.6.1
+;@Ahk2Exe-SetVersion 0.6.2
 ;@Ahk2Exe-SetCopyright 2026`, elModo7
 ;@Ahk2Exe-SetOrigFilename LibreDeck Server.exe
 ; INITIALIZE
@@ -11,7 +11,7 @@
 SetBatchLines, -1
 #NoEnv
 #Persistent
-global versionNumber := "0.6.1"
+global versionNumber := "0.6.2"
 global clientVersion := versionNumber " - elModo7 / VictorDevLog " A_YYYY
 global LD_ServerDiscoverySock := -1
 global LD_ServerDiscoverySocketCallback := ""
@@ -139,9 +139,9 @@ Return
 OnTCPRecvServer(this)
 {
     global Client, JSON
-    data := JSON.Load(this.RecvText())
     try
     {
+		data := JSON.Load(this.RecvText())
         Client.sendText(data.BotonVisual)
         scriptPath := ResolveButtonScriptPath(data.FicheroEjecutar)
         if(scriptPath != "" && FileExist(scriptPath))
