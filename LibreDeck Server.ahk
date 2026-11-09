@@ -2,7 +2,7 @@
 ; Requires AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Server
 ;@Ahk2Exe-SetDescription Macro Panel Server
-;@Ahk2Exe-SetVersion 0.6.2
+;@Ahk2Exe-SetVersion 0.6.3
 ;@Ahk2Exe-SetCopyright 2026`, elModo7
 ;@Ahk2Exe-SetOrigFilename LibreDeck Server.exe
 ; INITIALIZE
@@ -11,7 +11,7 @@
 SetBatchLines, -1
 #NoEnv
 #Persistent
-global versionNumber := "0.6.2"
+global versionNumber := "0.6.3"
 global clientVersion := versionNumber " - elModo7 / VictorDevLog " A_YYYY
 global LD_ServerDiscoverySock := -1
 global LD_ServerDiscoverySocketCallback := ""
@@ -120,6 +120,7 @@ guardarConfigShared:
 	FileRead, shared_conf, ./resources/shared/resourcePack_info.txt
 	FileRead, client_conf, ./conf/config.json
 	client_conf := JSON.Load(client_conf)
+	if (shared_conf == "") shared_conf := "{}"
 	shared_conf := JSON.Load(shared_conf)
 	shared_conf.folderButtons := client_conf.folderButtons
 	FileDelete, ./resources/shared/resourcePack_info.txt

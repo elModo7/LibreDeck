@@ -2,7 +2,7 @@
 ; Recommended AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 4.4.2
+;@Ahk2Exe-SetVersion 4.4.3
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -62,7 +62,7 @@ FileEncoding, UTF-8
 #Include <plugin_system>
 #Include <LibreDeckButtonImage>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "4.4.2"
+global ClientVersionNumber := "4.4.3"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -526,7 +526,7 @@ return
 
 ScriptGeneratorMenuCommand:
 	if(FileExist(A_ScriptDir "\resources\img\" BotonActivo ".png")) {
-		MsgBox 0x33, Replace button image?, This button already has an image`, do you want to replace it with the default one for this macro?
+		MsgBox 0x33, % LD_T("script_generator.replace_image_title", "Replace button image?"), % LD_T("script_generator.replace_image_prompt", "This button already has an image, do you want to replace it with the default one for this macro?")
 		IfMsgBox Yes, {
 			ScriptGeneratorPregenerarImagenBoton(BotonActivo, A_ThisMenuItem)
 		} Else IfMsgBox Cancel, {
