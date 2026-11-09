@@ -1,10 +1,10 @@
 {
 	"builtin_ahk":1,
-	"folderButtons":[
+	"folderButtons":{
 		"1":"App",
 		"2":"Folders",
 		"14":"OBS"
-	],
+	},
 	"port":7778,
 	"resourcePackMD5":"1759afb380473079070b0d3878f6dc35",
 	"resourceSharePort":7779,
