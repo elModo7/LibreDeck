@@ -87,13 +87,13 @@ A file named ***"LibreDeck Client.exe"*** will apear, run that file. Done!
 
 # Pictures & Videos:
 
-## LibreDeck flashed on a Waveshare 1.75C
+### LibreDeck flashed on a Waveshare 1.75C
 
 <a href="https://elmodo7.github.io/LibreDeck-ESP32-Waveshare-1.75C-flasher/">
   <img width="400" alt="LibreDeck on Waveshare ESP32-S3 1.75C" src="https://github.com/user-attachments/assets/2f0a3aa9-fbf1-4d3a-b35a-4e15d250910c" />
 </a>
 
-## Redit Post
+### Redit Post
 
 <a href="https://www.reddit.com/r/esp32/s/ZCWSWrWsgH" target="_blank" rel="noopener noreferrer">
   <img
