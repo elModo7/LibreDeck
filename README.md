@@ -79,8 +79,21 @@ A file named ***"LibreDeck Client.exe"*** will apear, run that file. Done!
 - Windows 10 (Previous versions work on win7)
 - AutoHotkey v1 1.37.02 (recommended U32)
 
+# ESP32 Version Web Flasher (Waveshare 1.75C)
+
+[![LibreDeck Web Flasher](https://github.com/user-attachments/assets/4db59c4b-5158-42b0-ac0c-df8441b6be4b)](https://elmodo7.github.io/LibreDeck-ESP32-Waveshare-1.75C-flasher/)
+
+
+
 # Pictures & Videos:
 
+## LibreDeck flashed on a Waveshare 1.75C
+
+<a href="https://elmodo7.github.io/LibreDeck-ESP32-Waveshare-1.75C-flasher/">
+  <img width="400" alt="LibreDeck on Waveshare ESP32-S3 1.75C" src="https://github.com/user-attachments/assets/2f0a3aa9-fbf1-4d3a-b35a-4e15d250910c" />
+</a>
+
+## Redit Post
 
 <a href="https://www.reddit.com/r/esp32/s/ZCWSWrWsgH" target="_blank" rel="noopener noreferrer">
   <img
