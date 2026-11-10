@@ -2,7 +2,7 @@
 ; Recommended AutoHotkeyU32
 ;@Ahk2Exe-SetName LibreDeck Client
 ;@Ahk2Exe-SetDescription Macro Panel Client
-;@Ahk2Exe-SetVersion 4.4.3
+;@Ahk2Exe-SetVersion 4.4.4
 ;@Ahk2Exe-SetCopyright 2026`, elModo7 - VictorDevLog
 ;@Ahk2Exe-SetOrigFilename LibreDeck Client.exe
 ; INITIALIZE
@@ -62,7 +62,7 @@ FileEncoding, UTF-8
 #Include <plugin_system>
 #Include <LibreDeckButtonImage>
 rutaSplash = ./resources/img/splash.png
-global ClientVersionNumber := "4.4.3"
+global ClientVersionNumber := "4.4.4"
 global ClientVersion := ClientVersionNumber " - elModo7 / VictorDevLog " A_YYYY
 SplashScreen(rutaSplash, 3000, 545, 160, 0, 0, true)
 global EsVisible = true
@@ -180,8 +180,42 @@ contextcolor(color:=2) ; change the number here from the list above if you want 
 ; *******************************
 Menu, tray, NoStandard
 Menu, tray, tip, LibreDeck Client v%ClientVersionNumber%
-Menu, tray, add, % LD_T("tray.run_server", "Run LibreDeck server"), runServer
-Menu tray, Icon, % LD_T("tray.run_server", "Run LibreDeck server"), .\resources\img\ico\libredeck.ico
+
+; Go Server submenu
+Menu, runServerGoMenu, Add, % LD_T("tray.visible", "Visible"), runServerGo
+Menu, runServerGoMenu, Icon, % LD_T("tray.visible", "Visible"), .\resources\img\ico\windows\cmd.ico
+Menu, runServerGoMenu, Add, % LD_T("tray.hidden", "Hidden"), runServerGoHidden
+Menu, runServerGoMenu, Icon, % LD_T("tray.hidden", "Hidden"), .\resources\img\ico\windows\cut_visibility.ico
+
+; ESP32 Server submenu
+Menu, runServerESP32Menu, Add, % LD_T("tray.visible", "Visible"), runServerESP32
+Menu, runServerESP32Menu, Icon, % LD_T("tray.visible", "Visible"), .\resources\img\ico\windows\cmd.ico
+Menu, runServerESP32Menu, Add, % LD_T("tray.hidden", "Hidden"), runServerESP32Hidden
+Menu, runServerESP32Menu, Icon, % LD_T("tray.hidden", "Hidden"), .\resources\img\ico\windows\cut_visibility.ico
+
+; Main server menu
+
+; Default server
+Menu, runServerMenu, Add, % LD_T("tray.run_default_server", "Default server"), runServer
+Menu, runServerMenu, Icon, % LD_T("tray.run_default_server", "Default server"), .\resources\img\ico\libredeck.ico
+
+; Go Server submenu
+Menu, runServerMenu, Add, % LD_T("tray.run_go_server", "Go server"), :runServerGoMenu
+Menu, runServerMenu, Icon, % LD_T("tray.run_go_server", "Go server"), .\resources\img\ico\libredeck.ico
+
+; ESP32 Server submenu
+Menu, runServerMenu, Add, % LD_T("tray.run_esp32_server", "ESP32 server"), :runServerESP32Menu
+Menu, runServerMenu, Icon, % LD_T("tray.run_esp32_server", "ESP32 server"), .\resources\img\ico\libredeck.ico
+
+; Stop all serves
+Menu, runServerMenu, Add, % LD_T("tray.stop_all_servers", "Stop all servers"), stopAllServers
+Menu, runServerMenu, Icon, % LD_T("tray.stop_all_servers", "Stop all servers"), .\resources\img\ico\windows\blocked.ico
+
+; Add the main server menu to the system tray
+Menu, tray, Add, % LD_T("tray.run_server", "Run LibreDeck server"), :runServerMenu
+Menu, tray, Icon, % LD_T("tray.run_server", "Run LibreDeck server"), .\resources\img\ico\libredeck.ico
+
+; Misc
 Menu, tray, add, % LD_T("tray.hide", "Hide"), ToggleHide
 Menu tray, Icon, % LD_T("tray.hide", "Hide"), .\resources\img\ico\windows\cut_visibility.ico
 Menu, tray, add, % LD_T("tray.set_editor_path", "Set Editor Path"), CambiarRutaEditor
@@ -3884,13 +3918,16 @@ LD_BuildLanguageMenu()
 		for code, _ in LD_i18n.locales
 		{
 			Menu, LanguageMenu, Add, %code%, ChangeLanguageFromTray
+			Menu, LanguageMenu, Icon, %code%, .\resources\img\ico\windows\internet_time.ico
 			count++
 		}
 	}
 	if(count = 0)
 	{
 		Menu, LanguageMenu, Add, en_US, ChangeLanguageFromTray
+		Menu, LanguageMenu, Icon, en_US, .\resources\img\ico\windows\internet_time.ico
 		Menu, LanguageMenu, Add, es_ES, ChangeLanguageFromTray
+		Menu, LanguageMenu, Icon, es_ES, .\resources\img\ico\windows\internet_time.ico
 	}
 	LD_UpdateLanguageMenuChecks()
 }
@@ -3920,7 +3957,38 @@ reloadPlugins:
 return
 
 runServer:
-	Run, LibreDeck Server.exe
+	forceKillProcessByName("LibreDeck Server.exe") ; Terminate previous version (sometimes "Singleinstance Force" may fail to replace previous instance and run two instances which we do not want)
+	Run, "LibreDeck Server.exe" ; Defaults #SingleInstance Force so it replaces itself
 return
+
+runServerESP32:
+	forceKillProcessByName("LibreDeck Server ESP32.exe")
+	Run, "LibreDeck Server ESP32.exe"
+return
+
+runServerESP32Hidden:
+	forceKillProcessByName("LibreDeck Server ESP32.exe")
+	Run, "LibreDeck Server ESP32.exe",, Hide
+return
+
+runServerGo:
+	forceKillProcessByName("LibreDeck Server Go.exe")
+	Run, "LibreDeck Server Go.exe"
+return
+
+runServerGoHidden:
+	forceKillProcessByName("LibreDeck Server Go.exe")
+	Run, "LibreDeck Server Go.exe",, Hide
+return
+
+stopAllServers:
+	forceKillProcessByName("LibreDeck Server Go.exe")
+	forceKillProcessByName("LibreDeck Server ESP32.exe")
+	forceKillProcessByName("LibreDeck Server.exe")
+return
+
+forceKillProcessByName(procName) {
+	RunWait, % "cmd /c taskkill /IM """ procName """ /F",, Hide
+}
 
 #Include plugins/plugin_list.ahk
